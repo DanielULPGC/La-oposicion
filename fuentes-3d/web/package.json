@@ -1,0 +1,10 @@
+{
+  "name": "el-tribunal-escena",
+  "private": true,
+  "description": "Escena 3D de «El tribunal»: empaquetado con esbuild y optimización con glTF-Transform",
+  "scripts": {
+    "bundle": "esbuild scene.js --bundle --format=iife --minify --target=es2019 --outfile=dist/escena.min.js",
+    "optimize": "gltf-transform optimize sala_baked.glb sala.glb --compress meshopt --texture-compress webp --texture-size 2048 --simplify false --instance false --join false --flatten false --palette false --prune false"
+  },
+  "devDependencies": { "three": "0.170.0", "esbuild": "0.24.0", "@gltf-transform/cli": "4.1.1" }
+}

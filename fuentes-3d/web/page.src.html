@@ -1,0 +1,961 @@
+<title>El tribunal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral+SC:wght@500;600&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: escena 3D del anfiteatro a la izquierda (arriba en móvil) y acta del tribunal como panel de trabajo */
+:root{
+  color-scheme: dark;
+  --bg:#12161b; --panel:#191e25; --raise:#212833; --line:#2e3744;
+  --fg:#e9e4d8; --muted:#a39d90; --brass:#cfa95e; --brass-ink:#1a1408;
+  --ok:#7fb59a; --mid:#e0b04f; --bad:#d27360;
+  --display:"Spectral SC", "Georgia", serif;
+  --body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.55}
+*{box-sizing:border-box}
+button,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+.app{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,480px);height:100%}
+.stage{position:relative;overflow:hidden;background:#0d1014;min-width:0}
+#scene{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#scene:active{cursor:grabbing}
+.hud{position:absolute;left:max(16px,env(safe-area-inset-left,0px));right:16px;top:16px;display:flex;justify-content:space-between;gap:12px;pointer-events:none;flex-wrap:wrap}
+.hud .tag{pointer-events:auto;background:rgba(18,22,27,.78);border:1px solid var(--line);padding:8px 12px;border-radius:4px;backdrop-filter:blur(6px)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--brass)}
+.hud h1{font-family:var(--display);font-weight:600;font-size:22px;margin:2px 0 0;line-height:1.1;text-wrap:balance}
+.hud-bottom{position:absolute;left:max(16px,env(safe-area-inset-left,0px));right:16px;bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.seg{display:flex;background:rgba(18,22,27,.82);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.seg button{background:none;border:0;padding:7px 11px;font-size:13px;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--brass);color:var(--brass-ink);font-weight:700}
+.count{font-family:var(--mono);font-size:12px;color:var(--muted);background:rgba(18,22,27,.82);border:1px solid var(--line);padding:7px 10px;border-radius:4px;font-variant-numeric:tabular-nums}
+.count b{color:var(--fg);font-weight:500}
+.loading{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;background:rgba(13,16,20,.72);color:var(--muted);font-family:var(--mono);font-size:12px;z-index:1}
+.lbar{width:min(260px,60vw);height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+.lbar i{display:block;height:100%;width:8%;background:var(--brass);transition:width .2s}
+@media (max-width:820px){.ql{display:none}.hud h1{font-size:16px}.seg button{padding:6px 9px}}
+#pause{background:rgba(18,22,27,.82);color:var(--fg);font-weight:400}
+.hud-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.qsel{display:flex;gap:6px;align-items:center;font-family:var(--mono);font-size:12px;color:var(--muted);background:rgba(18,22,27,.82);border:1px solid var(--line);padding:4px 8px;border-radius:4px}
+.qsel select{width:auto;padding:2px 4px;font-size:12px;background:var(--bg)}
+.nogl{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--muted)}
+
+.panel{overflow-y:auto;background:var(--panel);border-left:1px solid var(--line);padding-block:20px 40px;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));min-width:0}
+.acta-head{border-bottom:1px solid var(--line);padding-bottom:14px;display:grid;gap:6px}
+.acta-head .row{display:flex;flex-wrap:wrap;gap:4px 16px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.acta-head .row span b{color:var(--fg);font-weight:500}
+.stations{display:flex;gap:6px;margin:14px 0 4px;flex-wrap:wrap}
+.stations span{font-family:var(--mono);font-size:11px;padding:4px 8px;border:1px solid var(--line);border-radius:3px;color:var(--muted)}
+.stations span.on{border-color:var(--brass);color:var(--brass)}
+
+.tabs{display:flex;gap:2px;margin:16px 0 18px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 10px;cursor:pointer;color:var(--muted);white-space:nowrap;font-size:14px}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--brass);font-weight:700}
+.tabs .n{font-family:var(--mono);font-size:11px;color:var(--brass);margin-right:4px}
+
+h2{font-family:var(--display);font-weight:600;font-size:24px;line-height:1.15;margin:0 0 10px;text-wrap:balance}
+h3{font-family:var(--display);font-weight:500;font-size:18px;margin:22px 0 8px}
+p{margin:0 0 12px;max-width:62ch}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+
+blockquote.claim{margin:0 0 12px;padding:14px 16px;background:var(--raise);border-radius:4px;font-family:var(--display);font-size:19px;line-height:1.35}
+blockquote.claim cite{display:block;margin-top:8px;font-family:var(--mono);font-size:11px;font-style:normal;color:var(--muted);letter-spacing:.06em}
+.pager{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.dots{display:flex;gap:6px}
+.dots i{width:9px;height:9px;border-radius:50%;background:var(--line);display:block}
+.dots i.done{background:var(--brass)}
+.dots i.cur{outline:1px solid var(--brass);outline-offset:2px}
+
+.opts{display:grid;gap:8px;margin:14px 0}
+.opt{display:flex;gap:10px;align-items:center;text-align:left;background:transparent;border:1px solid var(--line);border-radius:4px;padding:10px 12px;cursor:pointer}
+.opt:hover{border-color:var(--muted)}
+.opt .sw{width:12px;height:12px;border-radius:2px;flex:none}
+.opt[aria-pressed="true"]{border-color:var(--brass);background:var(--raise)}
+.sos .sw{background:var(--ok)} .mat .sw{background:var(--mid)} .inf .sw{background:var(--bad)}
+
+.verdict{border-top:1px solid var(--line);padding-top:14px;margin-top:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:3px;border:1px solid currentColor}
+.chip.sos{color:var(--ok)} .chip.mat{color:var(--mid)} .chip.inf{color:var(--bad)}
+.chip.dato{color:var(--ok)} .chip.interp{color:var(--mid)} .chip.relato{color:var(--bad)}
+.ask{border-left:2px solid var(--brass);padding:4px 0 4px 12px;margin:12px 0;font-style:italic}
+
+.btn{background:var(--brass);color:var(--brass-ink);border:0;border-radius:4px;padding:9px 14px;font-weight:700;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line);font-weight:400}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+
+.cards{display:grid;gap:10px}
+.card{border:1px solid var(--line);border-radius:4px;padding:12px}
+.card p{margin:0 0 10px}
+.card .opts{grid-template-columns:repeat(3,minmax(0,1fr));margin:0}
+.card .opt{justify-content:center;text-align:center;font-size:13px;padding:8px 6px}
+.card .fb{margin-top:10px;font-size:14px}
+.dato .sw{background:var(--ok)} .interp .sw{background:var(--mid)} .relato .sw{background:var(--bad)}
+.legend{display:grid;gap:6px;margin:0 0 14px;font-size:14px}
+.legend div{display:flex;gap:8px;align-items:baseline}
+
+label.f{display:block;font-weight:700;margin:16px 0 6px;font-size:14px}
+textarea,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:10px;resize:vertical}
+textarea{min-height:88px}
+.check{display:flex;gap:8px;align-items:flex-start;margin:6px 0;font-size:14px}
+.score{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--muted);margin:6px 0 4px;font-variant-numeric:tabular-nums}
+.score b{color:var(--fg);font-weight:500;font-size:16px}
+.toast{font-size:13px;color:var(--ok);min-height:1.2em;margin-top:6px}
+
+.refs{margin-top:32px;border-top:1px solid var(--line);padding-top:12px}
+.refs summary{cursor:pointer;font-family:var(--display);font-size:17px}
+.refs ul{padding-left:18px;font-size:13.5px;color:var(--muted)}
+.refs li{margin:8px 0;overflow-wrap:anywhere}
+.refs a{color:var(--brass)}
+
+@media (max-width:820px){
+  html,body{height:auto}
+  .app{display:block;height:auto}
+  .stage{height:46vh;min-height:280px;position:sticky;top:0;z-index:2}
+  .panel{border-left:0;border-top:1px solid var(--line)}
+  .hud h1{font-size:18px}
+  .card .opts{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.stations button{font-family:var(--mono);font-size:11px;padding:4px 8px;border:1px solid var(--line);border-radius:3px;color:var(--fg);background:transparent;cursor:pointer}
+.stations button:hover{border-color:var(--muted)}
+.stations button.on{border-color:var(--brass);color:var(--brass)}
+.stations span{opacity:.6}
+.card .opts.four{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ruler{margin:4px 0 16px;padding:12px;border:1px solid var(--line);border-radius:4px;overflow-x:auto}
+.ruler svg{display:block;width:100%;min-width:300px;height:auto}
+.ruler .grid{stroke:var(--line);stroke-width:1}
+.ruler .tick{fill:var(--muted);font:10px var(--mono)}
+.ruler .lab{fill:var(--fg);font:11px var(--body)}
+.ruler .val{fill:var(--brass);font:10px var(--mono)}
+.ruler .bar{fill:var(--brass)}
+.ruler .ghost{fill:none;stroke:var(--line);stroke-dasharray:3 3}
+.ruler figcaption{margin-top:6px}
+.fb p{margin:0 0 6px}
+</style>
+<div class="app">
+  <section class="stage" aria-label="Escena tridimensional del anfiteatro">
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <div class="loading" id="loading" role="status"><div class="lbar"><i id="lbar"></i></div><span id="ltext">Cargando la sala…</span></div>
+    <div class="nogl" id="nogl" hidden>Este navegador no admite WebGL. El contenido completo está disponible en el panel de texto.</div>
+    <div class="hud">
+      <div class="tag">
+        <div class="eyebrow" id="st-eyebrow">Estación 1 de 5</div>
+        <h1 id="st-title">Pasado frente a Historia</h1>
+      </div>
+      <button class="tag btn ghost small" id="pause" aria-pressed="false" style="pointer-events:auto">Pausar animación</button>
+    </div>
+    <div class="hud-bottom">
+      <div class="seg" role="group" aria-label="Punto de vista">
+        <button data-view="sala" aria-pressed="true">Sala</button>
+        <button data-view="opositor" aria-pressed="false">Opositor</button>
+        <button data-view="tribunal" aria-pressed="false">Tribunal</button>
+      </div>
+      <div class="hud-right">
+        <label class="qsel" for="quality"><span class="ql">Calidad</span>
+          <select id="quality" disabled><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select>
+        </label>
+        <div class="count">Público en la sala: <b id="aud">6</b></div>
+      </div>
+    </div>
+  </section>
+
+  <main class="panel">
+    <header class="acta-head">
+      <div class="eyebrow">Acta de la sesión · Ejercicio oral</div>
+      <div class="row">
+        <span>Plaza: <b>Cátedra de Historia</b></span>
+        <span>Vocal: <b>4.º (tú)</b></span>
+        <span>Obra: <b>Mateo-Sagasta, <i>La oposición</i></b></span>
+      </div>
+    </header>
+    <nav class="stations" id="stations" aria-label="Estaciones del recorrido"></nav>
+
+    <nav class="tabs" role="tablist" aria-label="Fases de la estación">
+      <button role="tab" id="t-0" aria-controls="p-0" aria-selected="true"><span class="n">I</span>Convocatoria</button>
+      <button role="tab" id="t-1" aria-controls="p-1" aria-selected="false" tabindex="-1"><span class="n">II</span>Argumentos</button>
+      <button role="tab" id="t-2" aria-controls="p-2" aria-selected="false" tabindex="-1"><span class="n">III</span><span id="t2-label">Clasificar</span></button>
+      <button role="tab" id="t-3" aria-controls="p-3" aria-selected="false" tabindex="-1"><span class="n">IV</span>Dictamen</button>
+    </nav>
+
+    <section role="tabpanel" id="p-0" aria-labelledby="t-0"><div id="intro"></div></section>
+
+    <section role="tabpanel" id="p-1" aria-labelledby="t-1" hidden>
+      <div class="pager"><span id="cnum">Afirmación 1 de 5</span><span class="dots" id="dots"></span></div>
+      <div id="claim"></div>
+    </section>
+
+    <section role="tabpanel" id="p-2" aria-labelledby="t-2" hidden><div id="act"></div></section>
+
+    <section role="tabpanel" id="p-3" aria-labelledby="t-3" hidden>
+      <div id="dict"></div>
+      <div class="actions">
+        <button class="btn" id="copy">Copiar dictamen</button>
+        <button class="btn ghost" id="reset">Reiniciar estación</button>
+      </div>
+      <div class="toast" id="toast" role="status"></div>
+      <pre id="copybox" hidden></pre>
+    </section>
+
+    <details class="refs">
+      <summary>Referencias y procedencia</summary>
+      <ul>
+        <li>Mateo-Sagasta, A. (2016). <i>La oposición. Un relato sobre la invención de la historia</i> (pról. de L. A. de Cuenca). Reino de Cordelia. Editorial y año deducidos del prólogo y del sello de portada; confírmalos en la página de créditos.</li>
+        <li>Evans, R. J. (1997). <i>In defence of history</i>. Granta. Trad. esp.: <i>En defensa de la historia</i>, Siglo XXI.</li>
+        <li>Ginzburg, C. (1991). Checking the evidence: The judge and the historian. <i>Critical Inquiry, 18</i>(1), 79–92. <a href="https://doi.org/10.1086/448624" target="_blank" rel="noopener">https://doi.org/10.1086/448624</a></li>
+        <li>Hobsbawm, E. y Ranger, T. (Eds.). (1983). <i>The invention of tradition</i>. Cambridge University Press. Trad. esp.: <i>La invención de la tradición</i>, Crítica.</li>
+        <li>Hobsbawm, E. (1997). <i>On history</i>. Weidenfeld &amp; Nicolson. Trad. esp.: <i>Sobre la historia</i>, Crítica.</li>
+        <li>Jenkins, K. (2009). <i>Repensar la historia</i>. Siglo XXI.</li>
+        <li>Pérez Vejo, T. (2015). <i>España imaginada. Historia de la invención de una nación</i>. Galaxia Gutenberg.</li>
+        <li>Le Goff, J. (2014). <i>Faut-il vraiment découper l'histoire en tranches?</i> Seuil.</li>
+        <li>Pavone, C. (1991). <i>Una guerra civile. Saggio storico sulla moralità nella Resistenza</i>. Bollati Boringhieri.</li>
+        <li>Rüsen, J. (2005). <i>History: Narration, interpretation, orientation</i>. Berghahn Books.</li>
+        <li>Seixas, P. (2017). A model of historical thinking. <i>Educational Philosophy and Theory, 49</i>(6), 593–605. <a href="https://doi.org/10.1080/00131857.2015.1101363" target="_blank" rel="noopener">https://doi.org/10.1080/00131857.2015.1101363</a></li>
+        <li>Valéry, P. (1931). <i>Regards sur le monde actuel</i>. Stock.</li>
+        <li>Vansina, J. (1985). <i>Oral tradition as history</i>. University of Wisconsin Press.</li>
+        <li>White, H. (1973). <i>Metahistory: The historical imagination in nineteenth-century Europe</i>. Johns Hopkins University Press. Trad. esp.: <i>Metahistoria</i>, Fondo de Cultura Económica.</li>
+        <li>White, H. (2003). <i>El texto histórico como artefacto literario</i>. Paidós.</li>
+        <li>Weber, E. (1976). <i>Peasants into Frenchmen: The modernization of rural France, 1870-1914</i>. Stanford University Press.</li>
+        <li>Wineburg, S. S. (1991). Historical problem solving: A study of the cognitive processes used in the evaluation of documentary and pictorial evidence. <i>Journal of Educational Psychology, 83</i>(1), 73–87. <a href="https://doi.org/10.1037/0022-0663.83.1.73" target="_blank" rel="noopener">https://doi.org/10.1037/0022-0663.83.1.73</a></li>
+      </ul>
+      <p class="small muted">Escena 3D: modelos, texturas, maniquíes e iluminación precalculada creados para este recurso con Blender y Python, sin recursos de terceros; los reflejos usan un panorama renderizado de la propia sala. Motor: Three.js r170 (licencia MIT), incluido en la página. Si la escena realista no carga, la aplicación usa una versión simplificada.</p>
+      <p class="small muted">Los DOI y los datos fácticos de las cinco estaciones se verificaron en línea el 16 de octubre de 2026. Siguen sin confirmar la autoría de la frase atribuida a Felipe II y la carta de Napoleón a Josefina, que la estación 4 presenta como dudosas. Varias fechas antiguas y medievales son aproximadas o discutidas, y así se indica en la estación 2. Marco curricular: Real Decreto 157/2022 y Decreto 211/2022 de Canarias (área de Conocimiento del Medio Natural, Social y Cultural).</p>
+    </details>
+  </main>
+</div>
+
+<!--ESCENA-->
+<script>
+/* ---------- Contenido didáctico ---------- */
+const OPTS = {sos:"Sostenible", mat:"Sostenible con matices", inf:"Infundado tal como se formula"};
+const CATS = {dato:"Dato", interp:"Interpretación", relato:"Relato"};
+const BUCKETS = ["Menos de 60 años","Entre 60 y 250","Entre 250 y 600","Más de 600"];
+
+const STATIONS = [
+{ n:1, key:"tribunal-e1", short:"Pasado e Historia", title:"Pasado frente a Historia",
+  intro:`<h2>Te sientas como cuarto miembro del tribunal</h2>
+    <p>En el relato de Alfonso Mateo-Sagasta, un aspirante a catedrático de Historia defiende ante un tribunal de tres miembros que la Historia, entendida como relato del pasado, se construye desde el presente. La sala empieza con media docena de oyentes y termina abarrotada.</p>
+    <p>Tu función es distinta a la del tribunal de la novela. No juzgas al opositor por incomodar, sino por la solidez de lo que afirma. Aplicarás a sus argumentos el mismo escepticismo que él aplica a la Historia.</p>
+    <h3>Qué harás en esta estación</h3>
+    <p class="small"><b>II.</b> Valorar cinco afirmaciones del opositor y contrastarlas con la historiografía.<br>
+    <b>III.</b> Distinguir entre dato documentado, interpretación contrastable y relato identitario.<br>
+    <b>IV.</b> Redactar un dictamen razonado y emitir tu voto.</p>
+    <p class="small muted">Duración orientativa: 40 minutos. Las citas son fragmentos breves con indicación de página; la lectura de la obra completa sigue siendo imprescindible.</p>`,
+  start:"Abrir la sesión",
+  claims:[
+ {who:"El opositor", page:"p. 32", quote:"El pasado existió, ya lo creo. Lo que niego es la Historia.",
+  ctx:"Ante el escándalo del tribunal, el opositor separa el pasado, que considera inabarcable, de la Historia, a la que reduce a un relato oficial organizado como cadena de causas y efectos.",
+  crit:"inf",
+  an:"La distinción entre lo sucedido y el conocimiento que se elabora sobre ello es clásica y útil en el aula: el pasado no se recupera entero, se reconstruye a partir de huellas. El problema está en la conclusión. Que no exista un relato único y definitivo no implica que no exista conocimiento histórico. Hay procedimientos, como la crítica de fuentes, el contraste y la citación verificable, que permiten descartar relatos y preferir unos a otros. Ginzburg (1991) sostiene precisamente que la prueba limita lo que el historiador puede afirmar.",
+  q:"¿Qué tendría que ocurrir para que una afirmación histórica quedara refutada? Si nada pudiera refutarla, ¿seguiría siendo conocimiento?"},
+ {who:"El opositor", page:"p. 26", quote:"El modo en que contamos el pasado es consecuencia del presente.",
+  ctx:"Responde al vocal joven, que defiende que el presente es consecuencia del pasado y que la diversidad del alumnado no debería alterar la Historia escolar.",
+  crit:"sos",
+  an:"Es la tesis más defendible del opositor. Cada época formula preguntas nuevas al pasado: la historia de las mujeres, la de las migraciones o la historia global nacieron de inquietudes contemporáneas. La idea, que suele atribuirse a Benedetto Croce, de que toda historia es en cierto modo historia contemporánea apunta en la misma dirección. El matiz necesario es que las preguntas proceden del presente, pero las respuestas deben ajustarse a las fuentes. Las dos direcciones causales, además, no se excluyen.",
+  q:"Compara cómo presenta la conquista de Canarias un manual escolar actual y uno de los años sesenta. ¿Qué preguntas han cambiado? ¿Qué datos se mantienen?"},
+ {who:"El opositor", page:"p. 42", quote:"Cuenta los hechos como opina que pudieron ser.",
+  ctx:"Describe el oficio: el historiador elige tema e hipótesis, jerarquiza las fuentes y decide qué asocia y qué silencia.",
+  crit:"mat",
+  an:"La selección es inevitable y conviene enseñarla. Sin embargo, el texto confunde opinión con juicio razonado. El trabajo histórico expone sus decisiones mediante citas, procedencia de los documentos y criterios de selección, de modo que otras personas pueden revisarlas. Wineburg (1991) mostró que los historiadores expertos leen cada documento preguntando quién lo escribió, cuándo y con qué propósito, y lo contrastan con otros. Esa práctica convierte una opinión en una interpretación fundamentada.",
+  q:"El opositor compara la Historia con dos versiones de un mismo divorcio (p. 58). ¿Qué preguntas harías a cada versión antes de aceptarla?"},
+ {who:"El opositor", page:"p. 55", quote:"Cualquier hecho, en sí mismo, carece de valor.",
+  ctx:"El presidente le reta con un hecho indiscutible, el comienzo de la guerra civil. El opositor responde que el sentido del dato depende de quién lo relaciona con otros y cómo.",
+  crit:"mat",
+  an:"Acierta en que un dato aislado no explica nada: llamar al hecho «sublevación contra un poder legítimo» o «cruzada» cambia por completo su significado. Exagera al negarle valor, porque los datos son los que permiten descartar relatos. El propio diálogo lo demuestra: la sublevación comenzó en el Protectorado de Marruecos el 17 de julio de 1936 y se extendió a la Península el 18, de modo que la fecha que se cita en la escena es una simplificación. Sin datos verificables no podríamos detectar siquiera ese desajuste.",
+  q:"Redacta la misma fecha con dos titulares opuestos. ¿Qué palabras concretas cargan la interpretación?"},
+ {who:"El opositor", page:"p. 80", quote:"Todas las versiones veraces y coherentes del pasado serían igualmente válidas.",
+  ctx:"Es la reformulación del presidente, que el opositor acepta sin reservas poco antes del final de su exposición.",
+  crit:"inf",
+  an:"La coherencia es una condición necesaria, pero no suficiente. Dos relatos coherentes pueden ser igual de parciales. El ejemplo del propio opositor sobre la Segunda Guerra Mundial (p. 43) enfrenta el sacrificio soviético y la capacidad industrial estadounidense, dos factores que no se excluyen; una explicación mejor es la que integra ambos. Entre interpretaciones se puede elegir con criterios: amplitud de la evidencia que explican, capacidad de dar cuenta de los datos que las contradicen y transparencia del procedimiento. Esa fue la respuesta de Evans (1997) a las tesis de White y Jenkins.",
+  q:"Formula tres criterios que te permitan decidir cuál de dos explicaciones sobre un mismo hecho es mejor."}],
+  act:{type:"classify", tab:"Clasificar", score:"Clasificaciones acertadas", next:"Clasificar enunciados",
+    title:"Dato, interpretación o relato",
+    lead:"El opositor sostiene que un hecho aislado no significa nada hasta que alguien lo relaciona con otros. Pon a prueba esa idea clasificando estos enunciados, varios tomados de los ejemplos de la obra.",
+    items:[
+ {t:"Heródoto escribió sobre las Guerras Médicas décadas después de que terminaran.", a:"dato", e:"Se comprueba con la cronología del autor y de la obra. El opositor lo usa para cuestionar su fiabilidad (p. 45)."},
+ {t:"Los trescientos de las Termópilas defendieron la libertad de Europa frente al despotismo oriental.", a:"relato", e:"Proyecta sobre Esparta valores modernos. El opositor recuerda que su sociedad descansaba en la explotación de los ilotas (p. 77)."},
+ {t:"La conquista castellana de Gran Canaria concluyó en 1483.", a:"dato", e:"Fecha documentada. Otra cuestión es cómo se nombra el proceso (conquista, incorporación, integración), y ahí empieza la interpretación."},
+ {t:"La Unión Soviética fue el país con más muertes en la Segunda Guerra Mundial.", a:"dato", e:"Lo respaldan las estimaciones demográficas, aunque las cifras exactas varían según la fuente."},
+ {t:"La Unión Soviética ganó la guerra gracias al sacrificio de su pueblo.", a:"interp", e:"Explicación causal discutible con datos. Destaca un factor y deja otros en segundo plano (p. 43)."},
+ {t:"El golpe de julio de 1936 derivó en una guerra larga porque fracasó en buena parte del territorio.", a:"interp", e:"Hipótesis explicativa extendida en la historiografía, que se contrasta con la geografía de la sublevación."},
+ {t:"Covadonga marcó el nacimiento de España.", a:"relato", e:"Lectura retrospectiva: la idea de España como nación es muy posterior, y la batalla carece de testimonio contemporáneo (pp. 51-53)."},
+ {t:"La imagen de Cortés quemando sus naves demuestra que no había retorno posible.", a:"relato", e:"Las fuentes hablan de barrenar los barcos; el fuego es una dramatización que la memoria colectiva ha fijado (pp. 66-68)."}]},
+  dict:{fields:["El argumento más sólido del opositor y por qué","El argumento más débil y qué prueba lo refutaría","Qué Historia enseñarías en un aula de Primaria de Canarias"],
+    votes:["Apto: la exposición es discutible pero está argumentada","Apto con reservas: acierta en el diagnóstico y se excede en las conclusiones","No apto: confunde interpretación con invención"],
+    rubric:["Distingo entre pasado, fuentes e interpretación.","Valoro con criterios explícitos y no solo con mi acuerdo o desacuerdo.","Cito páginas concretas de la obra.","Propongo al menos una aplicación al aula de Primaria."]}
+},
+{ n:2, key:"tribunal-e2", short:"Fuentes", title:"Fuentes y tradición oral",
+  intro:`<h2>Las fuentes ante el tribunal</h2>
+    <p>En la parte central de la exposición (pp. 44-55), el opositor ataca la confianza del tribunal en las fuentes. Heródoto, Homero, las crónicas de la conquista islámica y la batalla de Covadonga desfilan como ejemplos de testimonios tardíos, únicos o transmitidos de boca en boca. El presidente responde que las fuentes no mienten.</p>
+    <p>En esta estación evaluarás a los dos bandos. El opositor maneja cifras concretas sobre la distancia entre los hechos y quienes los relatan. Comprobarás esas cifras, porque un escéptico también debe pasar el examen de las fuentes.</p>
+    <h3>Qué harás en esta estación</h3>
+    <p class="small"><b>II.</b> Valorar cinco afirmaciones del opositor y del presidente sobre la fiabilidad de las fuentes.<br>
+    <b>III.</b> Estimar cuántos años separan cada fuente de los hechos que narra y comparar tu estimación con la del opositor.<br>
+    <b>IV.</b> Redactar un dictamen y diseñar una actividad con fuentes orales de tu entorno.</p>
+    <p class="small muted">Duración orientativa: 45 minutos. Varias fechas antiguas y medievales son aproximadas o discutidas; la aplicación lo indica en cada caso.</p>`,
+  start:"Llamar a declarar a las fuentes",
+  claims:[
+ {who:"El presidente", page:"p. 44", quote:"Las fuentes ni mienten ni se pueden ignorar.",
+  ctx:"El presidente sostiene que cualquier falta de rigor se corrige acudiendo a las fuentes, porque en ellas no cabe engaño.",
+  crit:"inf",
+  an:"Las fuentes pueden mentir, equivocarse o ser falsificadas, y la propia novela ofrece un ejemplo: el opúsculo El buscapié, atribuido a Cervantes, fue obra de Adolfo de Castro (p. 40). La crítica de fuentes nació precisamente para eso: autentificar el documento, fecharlo, identificar a su autor y su intención. En Primaria, esta idea se traduce en tres preguntas ante cualquier documento: quién lo hizo, cuándo y para qué. La segunda mitad de la frase sí es correcta: una fuente no se puede ignorar. Hay que explicarla, incluso cuando miente.",
+  q:"Busca un documento que mienta y que, sin embargo, sea una fuente valiosa. ¿Qué nos dice sobre quien lo escribió?"},
+ {who:"El opositor", page:"p. 45", quote:"Muchas tienen valor exclusivamente porque son únicas.",
+  ctx:"Lo ilustra con Heródoto, a quien presenta como el único autor que aborda las Guerras Médicas.",
+  crit:"mat",
+  an:"Señala un problema real: cuando solo hay un testimonio, el historiador no puede contrastarlo y tiende a sobrevalorarlo. Pero el ejemplo elegido falla. Heródoto no es el único testimonio de las Guerras Médicas. Esquilo, que según la tradición combatió en Maratón, estrenó Los persas en 472 a. C., ocho años después de Salamina. La Columna de las Serpientes, ofrenda votiva de Delfos que hoy se conserva en Estambul, enumera las ciudades griegas que lucharon en Platea. Ninguna de estas fuentes es neutral, pero juntas permiten contrastar a Heródoto.",
+  q:"Cuando solo tienes una fuente, ¿qué puedes afirmar con seguridad y qué debes presentar como hipótesis?"},
+ {who:"El opositor", page:"p. 48", quote:"No se puede considerar fiable la información transmitida más allá de tres generaciones.",
+  ctx:"Lo atribuye a los antropólogos para negar valor histórico a la tradición oral que, según el tribunal, transmitió la guerra de Troya.",
+  crit:"mat",
+  an:"Tiene base. Jan Vansina (1985) describió en las tradiciones orales un patrón en el que el pasado reciente se recuerda con detalle, los orígenes se conservan como relato fundacional y el periodo intermedio se desdibuja, un vacío que denominó «hiato flotante». El error es convertir esa tendencia en una regla fija. El propio opositor admite que los poemas homéricos pueden conservar restos del mundo micénico (p. 49): el casco de colmillos de jabalí que describe la Ilíada corresponde a piezas micénicas halladas por la arqueología, varios siglos anteriores a la composición del poema. La tradición oral no es fiable o no fiable en bloque; se contrasta como cualquier fuente.",
+  q:"Entrevista a una persona mayor sobre la emigración canaria a Cuba o Venezuela. ¿Qué datos de su relato podrías comprobar en un archivo y cuáles no?"},
+ {who:"El opositor", page:"p. 52", quote:"Para ser sincero, eso tampoco está del todo claro.",
+  ctx:"La vocal ironiza con que, según su argumento, los árabes no habrían invadido la península Ibérica. Esta es la respuesta del opositor.",
+  crit:"inf",
+  an:"Aquí el escepticismo se convierte en negacionismo. Es cierto que las crónicas árabes son tardías y que la Crónica mozárabe de 754 se conserva en copias posteriores, lo que obliga a la crítica textual a cotejar manuscritos y detectar interpolaciones. Pero la conquista no depende solo de las crónicas. Hay monedas acuñadas en la Península con leyendas bilingües, en latín y árabe, hacia 716-717, y precintos de plomo vinculados a los pactos de la conquista. La tesis de que no hubo invasión la formuló Ignacio Olagüe en 1969 (en francés) y 1974 (en español), y la historiografía académica la ha rechazado. Dudar es legítimo; ignorar la evidencia material, no.",
+  q:"¿Qué tipos de fuentes, además de los textos, nos informan sobre el pasado? Clasifica las que conozcas en materiales, escritas, orales e iconográficas."},
+ {who:"El opositor", page:"pp. 54-55", quote:"¿Y aún creen que el monje [...] tenía más y mejor información?",
+  ctx:"Pide al tribunal que recuerde por tradición familiar algo de la guerra de 1808. Solo afloran unas coplas. De ahí deduce que el cronista de Covadonga, siglo y medio después de la batalla, no podía saber lo ocurrido.",
+  crit:"mat",
+  an:"Es una demostración didáctica excelente: en dos siglos, la memoria familiar de 1808 se ha reducido a unas coplas. La analogía tiene, sin embargo, un límite. Hoy nadie conoce 1808 por tradición familiar, sino por archivos, prensa e historiografía; la pregunta pertinente sobre el cronista no es si tenía memoria oral, sino de qué textos intermedios pudo disponer. Ese punto se discute entre especialistas: unos suponen fuentes escritas anteriores hoy perdidas y otros lo niegan. La duda del opositor es razonable; su conclusión, que todo sea ficción, va más allá de lo que la prueba permite.",
+  q:"Recoge en clase coplas, refranes o canciones sobre un hecho histórico de Canarias, como el ataque de Nelson a Santa Cruz de Tenerife en 1797. ¿Qué información transmiten y qué deforman?"}],
+  act:{type:"ruler", tab:"Medir distancias", score:"Distancias estimadas", next:"Medir distancias",
+    title:"La regla del tiempo",
+    lead:"Estima cuántos años separan cada fuente de los hechos que narra. Después compara el resultado con la cifra que da el opositor. Las fechas antiguas son aproximadas y algunas se discuten; el orden de magnitud es lo que importa.",
+    items:[
+ {src:"Esquilo, Los persas", ev:"Batalla de Salamina", evY:-480, srcY:-472, evT:"480 a. C.", srcT:"472 a. C.", b:0,
+  nov:"No la menciona: presenta a Heródoto como fuente única (p. 45).", ok:false, lbl:"Fuente omitida por el opositor",
+  e:"Una tragedia, no una crónica, pero escrita por un contemporáneo y estrenada ante quienes habían combatido."},
+ {src:"Heródoto, Historias", ev:"Guerras Médicas", evY:-480, srcY:-430, evT:"490-479 a. C.", srcT:"hacia 430 a. C.", b:0,
+  nov:"«Cincuenta años después» (p. 45).", ok:true,
+  e:"La cifra del opositor es correcta. Heródoto pudo hablar con testigos de segunda generación."},
+ {src:"Ilíada (fijación escrita)", ev:"Destrucción de Troya VIIa", evY:-1180, srcY:-700, evT:"hacia 1180 a. C. (discutida)", srcT:"siglos VIII-VII a. C.", b:2,
+  nov:"«Quinientos años» de tradición oral (p. 47).", ok:true,
+  e:"El orden de magnitud es correcto, aunque las dos fechas extremas se discuten."},
+ {src:"Crónica mozárabe de 754", ev:"Conquista islámica", evY:711, srcY:754, evT:"711", srcT:"754", b:0,
+  nov:"«Apenas cuarenta años» (p. 53, lo dice la vocal).", ok:true,
+  e:"Cercana a los hechos. El problema que señala el opositor es otro: se conserva en copias posteriores."},
+ {src:"Crónica de Alfonso III", ev:"Batalla de Covadonga", evY:722, srcY:885, evT:"722 (fecha tradicional; otros proponen 718)", srcT:"hacia 880-890", b:1,
+  nov:"«Pasados ciento cincuenta años» (p. 51).", ok:true,
+  e:"Cifra aproximadamente correcta. Se conserva en dos versiones con diferencias entre sí."},
+ {src:"Crónica del moro Rasis (al-Razi)", ev:"Conquista islámica", evY:711, srcY:950, evT:"711", srcT:"original hacia 950; versión romance hacia 1300", b:1,
+  nov:"«Doscientos años posterior» (p. 53).", ok:true,
+  e:"Correcto en lo esencial. El original árabe se perdió; lo conocemos por una traducción romance muy posterior."},
+ {src:"Ibn Jaldún", ev:"Conquista islámica", evY:711, srcY:1380, evT:"711", srcT:"finales del siglo XIV", b:3,
+  nov:"«Quinientos años después» (p. 53).", ok:false,
+  e:"El opositor se queda corto: la distancia real ronda los 650-700 años."},
+ {src:"Al-Maqqari, Nafh al-tib", ev:"Conquista islámica", evY:711, srcY:1630, evT:"711", srcT:"hacia 1630", b:3,
+  nov:"«Ochocientos» años (p. 53).", ok:false,
+  e:"También se queda corto: la distancia supera los 900 años. El argumento del opositor sale reforzado, pero sus cifras no son exactas."}]},
+  dict:{fields:["La fuente más cercana a los hechos y por qué la cercanía no basta","Dónde se excede el opositor, o el presidente, al valorar las fuentes","Una actividad de Primaria con fuentes orales o materiales de tu entorno en Canarias"],
+    votes:["Apto: su crítica de fuentes es pertinente","Apto con reservas: acierta en la duda y yerra en algunas cifras y ejemplos","No apto: confunde fuente tardía con fuente falsa"],
+    rubric:["Distingo entre distancia temporal y fiabilidad.","Compruebo las cifras del opositor antes de aceptarlas.","Cito páginas concretas de la obra.","Propongo una actividad con fuentes orales o materiales."]}
+},
+{ n:3, key:"tribunal-e3", short:"Mitos", title:"Mitos fundacionales",
+  intro:`<h2>Reliquias, monumentos y héroes</h2>
+    <p>Entre las páginas 49 y 77, el opositor pasa de las fuentes a los mitos. Arturo, Pelayo, la Tizona, los santos lugares de Jerusalén, el palacio de Cnosos, Espartaco y El Álamo le sirven para sostener que la Historia funciona como una religión nacional, con sacerdotes, templos y reliquias. El tribunal se escandaliza y el público no deja de llegar.</p>
+    <p>Su diagnóstico conecta con un campo de estudio consolidado. Hobsbawm y Ranger (1983) mostraron que muchas tradiciones presentadas como antiquísimas se inventaron o reformularon en los siglos XIX y XX. Pero quien desmonta mitos también puede crear otros. En esta estación comprobarás si el opositor acierta en cada caso o si incurre en los mismos errores que denuncia.</p>
+    <h3>Qué harás en esta estación</h3>
+    <p class="small"><b>II.</b> Valorar cinco afirmaciones del opositor sobre héroes, reliquias y lugares de memoria.<br>
+    <b>III.</b> Peritar diez objetos y lugares: qué es auténtico, qué significado se les ha añadido y qué es reconstrucción.<br>
+    <b>IV.</b> Redactar un dictamen y proponer cómo tratar una leyenda en el aula de Primaria.</p>
+    <p class="small muted">Duración orientativa: 45 minutos. Algunos casos dependen de peritajes discutidos; la aplicación lo indica.</p>`,
+  start:"Abrir la sala de reliquias",
+  claims:[
+ {who:"El opositor", page:"pp. 49-50", quote:"Monmouth era, simplemente, un gran poeta.",
+  ctx:"Sostiene que Arturo no aparece en ninguna fuente contemporánea: lo nombra Nennio en el siglo IX y lo convierte en héroe nacional Godofredo de Monmouth tres siglos después.",
+  crit:"sos",
+  an:"Es la posición mayoritaria entre los historiadores. Gildas, que escribe en el siglo VI sobre las guerras contra los sajones, no menciona a Arturo, y el resto de los testimonios son muy posteriores. Las tumbas que los monjes de Glastonbury dijeron descubrir en 1191 se consideran una invención interesada, tras el incendio que había arruinado la abadía. Conviene, sin embargo, formular la conclusión con precisión: el silencio de las fuentes permite afirmar que no hay pruebas de un Arturo histórico, no demostrar que no existiera nadie en quien se inspirara la leyenda.",
+  q:"¿En qué se diferencia «no hay pruebas de que existiera» de «está demostrado que no existió»? Busca un ejemplo de cada caso."},
+ {who:"El opositor", page:"p. 62", quote:"El rey David parece tan real como el rey Arturo.",
+  ctx:"Lo dice al cuestionar que la tumba de David se encuentre en la planta baja del Cenáculo de Jerusalén.",
+  crit:"inf",
+  an:"Acierta sobre la tumba y yerra sobre el rey. La identificación del sepulcro del Cenáculo procede de una tradición medieval sin respaldo arqueológico. Pero la comparación con Arturo es falsa: la estela de Tel Dan, hallada en 1993 y fechada en el siglo IX a. C., menciona la «casa de David», es decir, una dinastía que se reconocía descendiente de un rey de ese nombre. Para Arturo no existe nada equivalente. La extensión del reino davídico y los relatos bíblicos sobre su vida siguen siendo objeto de debate, pero la existencia del personaje tiene un apoyo epigráfico que Arturo no tiene.",
+  q:"¿Qué tipo de prueba material cambiaría nuestra opinión sobre Arturo? ¿Dónde y cómo podría aparecer?"},
+ {who:"El opositor", page:"p. 64", quote:"De seis mil a un millón seiscientos mil euros por una cuestión de fe.",
+  ctx:"Se refiere a la Tizona, que según la novela compró el Gobierno de Castilla y León en 2007 y que se expone en el Museo de Burgos, pese a que los peritajes discrepaban sobre su relación con el Cid.",
+  crit:"mat",
+  an:"Los datos básicos se sostienen con un matiz: la espada se vendió en 2007-2008 por 1,5 o 1,6 millones de euros, según las fuentes, y no la pagó directamente la Junta, sino un grupo de empresas y una fundación que después se la donaron. Los peritajes discrepan: un estudio de 2001 fechó el acero hacia el siglo XI, la empuñadura es del siglo XV y Menéndez Pidal la consideró una falsificación. Lo que el opositor simplifica es el valor de una pieza patrimonial. Una espada medieval que la tradición vincula a una donación de Fernando el Católico hacia 1470, y que la familia de los marqueses de Falces conservó al menos desde el siglo XVII, tiene valor histórico aunque no perteneciera a Rodrigo Díaz: es testimonio de cómo se construyó y transmitió la memoria del héroe. La pregunta didáctica no es si la espada es «verdadera», sino qué nos cuenta su historia como reliquia.",
+  q:"Elige un objeto de un museo de Canarias. Separa su valor como fuente sobre el pasado de su valor como símbolo para el presente."},
+ {who:"El opositor", page:"p. 74", quote:"El auténtico Espartaco nunca pretendió abolir la esclavitud.",
+  ctx:"Contrapone el Espartaco de la novela de Howard Fast y de la película protagonizada por Kirk Douglas, con guion de Dalton Trumbo, al gladiador de las fuentes antiguas.",
+  crit:"sos",
+  an:"Es una afirmación bien fundada. Ni Plutarco ni Apiano atribuyen a Espartaco un programa para acabar con la esclavitud; su rebelión buscaba la libertad de los sublevados y quizá su salida de Italia. Apiano relata, además, que sacrificó a trescientos prisioneros romanos en honor de su lugarteniente Crixo. La imagen del libertador universal es moderna: la difundieron, entre otros, la Liga Espartaquista alemana de 1916-1919, la novela de Fast (1951) y la película de 1960. El caso muestra con claridad cómo cada presente selecciona en el pasado los héroes que necesita.",
+  q:"Busca otros personajes que hoy se presentan con valores que no podían tener en su época. ¿Qué ganamos y qué perdemos al hacerlo?"},
+ {who:"El opositor", page:"p. 76", quote:"La esclavitud, abolida por Hidalgo y Morelos en la primera constitución de México.",
+  ctx:"Sostiene que El Álamo, símbolo de libertad para los estadounidenses, representa en realidad el triunfo del partido esclavista frente a un México abolicionista.",
+  crit:"mat",
+  an:"El fondo del argumento tiene base. La Constitución de la República de Texas de 1836 protegía la esclavitud, Travis era propietario de un esclavo llamado Joe, que sobrevivió a la batalla, y Bowie había participado en el tráfico de esclavos. Pero el dato que aporta el opositor es inexacto. Hidalgo decretó la abolición en 1810 y Morelos la recogió en 1813, pero la Constitución de Apatzingán de 1814 nunca llegó a aplicarse; la abolición efectiva fue el decreto de Vicente Guerrero de 1829, del que Texas logró quedar exenta. Además, la esclavitud fue una causa de la revuelta, no la única: pesaron también el centralismo de Santa Anna y la suspensión de la Constitución federal de 1824.",
+  q:"El opositor corrige un mito con otro relato simplificado. ¿Cómo se evita sustituir una leyenda heroica por una leyenda negra?"}],
+  act:{type:"classify", tab:"Peritar", score:"Peritajes acertados", next:"Peritar objetos y lugares",
+    title:"Peritaje de reliquias",
+    lead:"El opositor afirma que cada nación tiene sus parques temáticos (p. 61). Actúa como perito: decide si cada objeto o lugar es auténtico, si es auténtico pero se le ha añadido un significado, o si se trata de una reconstrucción o de una atribución dudosa.",
+    cats:{
+      a:{l:"Auténtico", cls:"dato", d:"Pieza o lugar del pasado, bien datado y documentado."},
+      b:{l:"Significado añadido", cls:"interp", d:"Auténtico, pero cargado después de una leyenda o de un valor simbólico."},
+      c:{l:"Reconstrucción o atribución dudosa", cls:"relato", d:"Rehecho en época moderna o atribuido sin pruebas suficientes."}},
+    items:[
+ {t:"Estela de Tel Dan", s:"Museo de Israel, Jerusalén", a:"a", e:"Inscripción aramea del siglo IX a. C. hallada en excavación arqueológica en 1993. Menciona la «casa de David»."},
+ {t:"Cueva Pintada de Gáldar", s:"Gran Canaria", a:"a", e:"Conjunto de época prehispánica documentado mediante excavación arqueológica y musealizado in situ."},
+ {t:"Muralla romana de Barcino", s:"Barcelona", a:"a", e:"Restos auténticos de la muralla romana tardía, integrados en edificios posteriores."},
+ {t:"Piedra de Scone", s:"Escocia", a:"b", e:"Piedra auténtica usada en coronaciones escocesas y, desde que Eduardo I se la llevó en 1296, en las inglesas. Volvió a Escocia en 1996. Las leyendas sobre su origen bíblico son añadidos."},
+ {t:"Misión de El Álamo", s:"San Antonio, Texas", a:"b", e:"Edificio auténtico del siglo XVIII cuyo significado como símbolo de libertad se construyó después (pp. 75-77)."},
+ {t:"Iglesia del Santo Sepulcro", s:"Jerusalén", a:"b", e:"Edificio auténtico. El lugar se identificó en el siglo IV; la arqueología hace verosímil, aunque no demostrable, la tradición. El papel de Santa Elena en el hallazgo de la cruz es una leyenda posterior a su muerte (p. 62)."},
+ {t:"Tizona", s:"Museo de Burgos", a:"c", e:"Espada medieval con hoja quizá del siglo XI y empuñadura del XV, en manos de los marqueses de Falces al menos desde el siglo XVII. Su atribución al Cid no está demostrada y los peritajes discrepan (pp. 63-64)."},
+ {t:"Tumbas de Arturo y Ginebra", s:"Abadía de Glastonbury", a:"c", e:"Los monjes anunciaron su hallazgo en 1191; se considera una invención para atraer peregrinos y financiación (p. 50)."},
+ {t:"Palacio de Cnosos tal como se visita", s:"Creta", a:"c", e:"Restos auténticos de la Edad del Bronce con amplias reconstrucciones en hormigón y pinturas completadas a partir de fragmentos por el equipo de Arthur Evans (p. 63)."},
+ {t:"Pont del Bisbe", s:"Barrio Gótico, Barcelona", a:"c", e:"Puente neogótico construido en 1928. El opositor exagera al decir que todo el barrio es un pastiche, pero acierta en que buena parte de su aspecto «medieval» procede del siglo XX (p. 63)."}]},
+  dict:{fields:["Un mito fundacional que aprendiste en la escuela y qué dicen hoy las fuentes","Dónde acierta el opositor al desmontar mitos y dónde comete los errores que denuncia","Cómo trabajarías una leyenda de Canarias en Primaria sin destruirla ni presentarla como historia"],
+    votes:["Apto: desmonta mitos con fundamento","Apto con reservas: acierta en lo general y comete errores que él mismo criticaría","No apto: sustituye unos mitos por otros"],
+    rubric:["Distingo entre el objeto, su historia documentada y su significado simbólico.","Formulo conclusiones proporcionadas a las pruebas disponibles.","Cito páginas concretas de la obra.","Propongo un tratamiento de la leyenda adecuado a Primaria."]}
+},
+{ n:4, key:"tribunal-e4", short:"Recursos dramáticos", title:"Recursos dramáticos",
+  intro:`<h2>La Historia como relato</h2>
+    <p>Entre las páginas 64 y 73, el opositor sostiene que la Historia usa las herramientas de la ficción para que se recuerde: tramas con planteamiento, nudo y desenlace, imágenes de gran fuerza como las naves en llamas y frases lapidarias que funcionan como eslóganes publicitarios. Lo ilustra con Cortés, la Armada, las guerras civiles europeas y una serie de frases célebres.</p>
+    <p>La tesis procede de Hayden White, que analizó cómo los historiadores del siglo XIX organizaban sus obras según tramas literarias. Es una de las aportaciones más útiles de la obra para el aula. En esta estación comprobarás las imágenes y las frases que el opositor denuncia, y también las que él mismo propone.</p>
+    <h3>Qué harás en esta estación</h3>
+    <p class="small"><b>II.</b> Valorar cinco afirmaciones del opositor sobre narración, periodización y simplificación.<br>
+    <b>III.</b> Rastrear la procedencia de nueve frases célebres.<br>
+    <b>IV.</b> Redactar un dictamen y diseñar una actividad de verificación de frases para Primaria.</p>
+    <p class="small muted">Duración orientativa: 40 minutos. En dos frases la procedencia sigue sin aclarar; la aplicación lo indica en lugar de ocultarlo.</p>`,
+  start:"Abrir la sesión",
+  claims:[
+ {who:"El opositor", page:"p. 65", quote:"El oficio de historiador es, en gran medida, el oficio de escritor.",
+  ctx:"Atribuye la idea a Hayden White o quizá a Keith Jenkins; reconoce que no recuerda a cuál de los dos.",
+  crit:"mat",
+  an:"Hayden White mostró en Metahistoria (1973) que los grandes historiadores del siglo XIX organizaban sus obras como romances, tragedias, comedias o sátiras, y que esa elección condicionaba la explicación. Es un hallazgo valioso para enseñar a leer un manual. La diferencia con la novela está en el aparato que acompaña al relato: notas, referencias y fuentes que cualquiera puede comprobar, y que limitan lo que el historiador puede escribir. La escena ofrece además una ironía útil: el opositor no recuerda a quién cita. En un trabajo académico, ese descuido sería suficiente para no aceptar la afirmación.",
+  q:"Lee el tema de un libro de texto de Primaria. ¿Tiene protagonistas, conflicto, clímax y desenlace? ¿Qué personajes quedan fuera?"},
+ {who:"El opositor", page:"p. 66", quote:"Cualquier estructura narrativa que responda al clásico planteamiento, nudo y desenlace es una ficción.",
+  ctx:"Sostiene que hablar del origen y el fin del Imperio romano, del feudalismo o de la Guerra de los Treinta Años es una convención, porque el pasado es un continuo.",
+  crit:"mat",
+  an:"La periodización es una convención, y conviene enseñarlo así: Jacques Le Goff dedicó su último ensayo (2014) a discutir los cortes de la historia. Pero una convención no es una ficción arbitraria. Los periodos agrupan cambios reales y se discuten con datos: el debate sobre si Roma cayó o se transformó enfrenta a especialistas que comparan la producción de cerámica, las monedas o la construcción. En Canarias ocurre lo mismo con los límites entre la etapa prehispánica y la conquista, que no fueron simultáneos en todas las islas.",
+  q:"¿En qué año termina la etapa prehispánica de Canarias? Comprueba si la respuesta es la misma para Lanzarote, Gran Canaria y Tenerife."},
+ {who:"El opositor", page:"p. 67", quote:"Si prescindimos del detalle de que Cortés nunca quemó sus naves.",
+  ctx:"Explica que las naves fueron barrenadas y hundidas, y enumera otros jefes a los que la tradición atribuye la misma hazaña: Alejandro, Agatocles, César, Juliano, Guillermo de Normandía y Bohemundo.",
+  crit:"sos",
+  an:"La afirmación central es correcta. En su segunda carta de relación, de 1520, el propio Cortés cuenta que hizo varar los barcos con el pretexto de que no podían navegar, y Bernal Díaz del Castillo coincide; el fuego pertenece a versiones posteriores. La lista de antecedentes, en cambio, mezcla casos documentados y leyendas, y contiene un error: Agatocles no quemó sus naves en Sicilia, sino al desembarcar en África, en el 310 a. C. El de Juliano en el Tigris, en el 363, sí lo relata un testigo, Amiano Marcelino. El opositor critica las imágenes repetidas y repite, sin comprobarla, una lista heredada.",
+  q:"¿Por qué una imagen falsa puede ser más eficaz que la verdadera para recordar un hecho? ¿Qué se pierde al usarla en clase?"},
+ {who:"El opositor", page:"p. 69", quote:"España envió cuatro grandes flotas contra Inglaterra.",
+  ctx:"Lo usa para mostrar que el relato oficial simplifica: solo recuerda la Armada de 1588 y olvida las expediciones de Felipe II y Felipe III que siguieron.",
+  crit:"mat",
+  an:"Es cierto que hubo nuevas expediciones en 1596 y 1597, dispersadas por temporales, y una tercera en 1601 que desembarcó en Kinsale, en Irlanda. Exagera al decir que fueron de igual tamaño: la de 1588 fue la mayor. Y su ejemplo incurre en el mismo defecto que denuncia, porque omite la expedición inglesa de 1589, dirigida por Drake y Norris, que fracasó ante A Coruña y Lisboa y que la historiografía británica tardó en incorporar a su relato. Canarias también forma parte de esta guerra: Drake atacó Las Palmas de Gran Canaria en 1595 y fue rechazado, y Van der Does la tomó y saqueó en 1599, aunque sus tropas fueron derrotadas en el interior de la isla, en El Batán.",
+  q:"¿Qué cuentan sobre los ataques de 1595 y 1599 los materiales escolares de Gran Canaria? Compáralo con lo que cuentan los manuales sobre la Armada de 1588."},
+ {who:"El opositor", page:"p. 70", quote:"El vencedor de la guerra en Italia fue el Partido Comunista.",
+  ctx:"Sostiene que en la década de 1940 Francia e Italia vivieron sus propias guerras civiles, ocultas tras el relato de la lucha contra el nazismo.",
+  crit:"inf",
+  an:"La primera parte tiene respaldo historiográfico: Claudio Pavone tituló Una guerra civil (1991) su estudio sobre la Resistencia italiana, y en Francia se habla del enfrentamiento entre Vichy y la Resistencia como una guerra entre franceses. La segunda parte es errónea. El Partido Comunista tuvo un papel destacado en la Resistencia y en la Asamblea Constituyente, pero salió del Gobierno en 1947 y la Democracia Cristiana ganó las elecciones de 1948. Afirmar que fue el vencedor es una simplificación del mismo tipo que el opositor atribuye a la Historia oficial.",
+  q:"¿Por qué la guerra civil española se presenta como prólogo de la Segunda Guerra Mundial y otras guerras civiles europeas casi no aparecen en los manuales?"}],
+  act:{type:"classify", tab:"Rastrear frases", score:"Frases rastreadas", next:"Rastrear frases célebres",
+    title:"Frases con pedigrí",
+    lead:"El opositor afirma que muchas frases célebres se forjaron años después de los hechos (pp. 71-72). Comprueba la procedencia de cada una: si la recoge una fuente contemporánea, si la atribuye un autor antiguo o posterior, o si es apócrifa o de origen dudoso.",
+    cats:{
+      a:{l:"Documentada", cls:"dato", d:"La recoge una fuente de la época o un registro oficial."},
+      b:{l:"Atribución antigua", cls:"interp", d:"La transmite un autor posterior a los hechos, a veces como rumor."},
+      c:{l:"Apócrifa o dudosa", cls:"relato", d:"Aparece mucho después o no se ha localizado su fuente."}},
+    items:[
+ {t:"«Dejemos el pasado a la historia, sobre todo porque me propongo escribirla yo»", s:"Winston Churchill", a:"a", e:"Consta en las actas de la Cámara de los Comunes del 23 de enero de 1948. La versión de la novela (p. 57) es una variante simplificada de la frase original."},
+ {t:"«Alea iacta est» («La suerte está echada»)", s:"Julio César, ante el Rubicón (49 a. C.)", a:"b", e:"La transmiten Suetonio y Plutarco, más de siglo y medio después. Plutarco afirma que la pronunció en griego, citando un verso del comediógrafo Menandro."},
+ {t:"«Veni, vidi, vici»", s:"Julio César, tras la batalla de Zela (47 a. C.)", a:"b", e:"Suetonio la sitúa en un cartel del desfile triunfal y Plutarco, en una carta. Es plausible, pero solo la conocemos por autores posteriores."},
+ {t:"«¿Tú también, hijo mío?»", s:"Julio César, ante Bruto (44 a. C.)", a:"b", e:"Suetonio la recoge como algo que «algunos» contaban, en griego; él mismo afirma que César murió sin decir palabra. El «Et tu, Brute?» latino procede del teatro renacentista."},
+ {t:"«Roma no paga traidores»", s:"Sobre los asesinos de Viriato (139 a. C.)", a:"c", e:"Las fuentes antiguas relatan que Roma no pagó a los asesinos, pero la frase no aparece en ellas (p. 71)."},
+ {t:"«Yo envié mis naves a luchar contra los hombres, no contra los elementos»", s:"Felipe II, tras la Armada de 1588", a:"c", e:"No consta en fuentes del siglo XVI. El opositor la atribuye a Modesto Lafuente (p. 72); esa autoría concreta no la hemos podido verificar."},
+ {t:"«París bien vale una misa»", s:"Enrique IV de Francia (1593)", a:"c", e:"Se le atribuyó en colecciones de anécdotas posteriores; no hay testimonio de que la pronunciara."},
+ {t:"«Eppur si muove» («Y sin embargo, se mueve»)", s:"Galileo Galilei (1633)", a:"c", e:"Aparece impresa por primera vez en 1757, en The Italian Library de Giuseppe Baretti, más de un siglo después del proceso."},
+ {t:"«Llegaré en tres días. No te laves»", s:"Napoleón a Josefina", a:"c", e:"El vocal la presenta como absolutamente veraz porque «se conserva la carta» (p. 72). No hemos localizado esa carta en una edición fiable de la correspondencia; mientras no aparezca, trátala como atribución dudosa. Es otro ejemplo de lo que denuncia el opositor, esta vez en boca del tribunal."}]},
+  dict:{fields:["Un recurso dramático que hayas encontrado en un libro de texto, un museo o una película","Dónde acierta el opositor al denunciar las simplificaciones y dónde simplifica él mismo","Cómo usarías una frase célebre en Primaria para enseñar a comprobar su procedencia"],
+    votes:["Apto: su análisis del relato histórico es pertinente","Apto con reservas: denuncia simplificaciones y cae en otras","No apto: confunde narrar con inventar"],
+    rubric:["Distingo entre la forma narrativa y la base documental de un relato.","Compruebo la procedencia de las frases y los ejemplos antes de aceptarlos.","Cito páginas concretas de la obra.","Propongo una actividad de verificación adecuada a Primaria."]}
+},
+{ n:5, key:"tribunal-e5", short:"Para qué enseñar", title:"Para qué enseñar Historia",
+  intro:`<h2>La pregunta que abre y cierra la oposición</h2>
+    <p>El opositor empieza su exposición con un aula de Primaria cada vez más diversa (pp. 24-31) y la termina con una definición: la Historia es un relato coherente y dramatizado del pasado, que se narra mirando hacia adelante (pp. 78-83). Entre ambos extremos discute con el tribunal para qué sirve enseñarla: crear soldados, construir identidades, evitar que se repitan los horrores o decidir quiénes queremos ser.</p>
+    <p>Es la estación que más afecta a tu futuro trabajo docente. Valorarás las tesis finales del opositor, clasificarás distintas finalidades de la Historia escolar y emitirás tu voto definitivo, que podrás comparar con el del tribunal de la novela.</p>
+    <h3>Qué harás en esta estación</h3>
+    <p class="small"><b>II.</b> Valorar cinco afirmaciones sobre las finalidades de la Historia.<br>
+    <b>III.</b> Clasificar nueve finalidades de la Historia escolar.<br>
+    <b>IV.</b> Redactar el dictamen final y revisar el acta completa de tus cinco estaciones.</p>
+    <p class="small muted">Duración orientativa: 50 minutos. Conviene haber completado las estaciones anteriores para que el acta final esté completa.</p>`,
+  start:"Abrir la última sesión",
+  claims:[
+ {who:"El opositor", page:"p. 30", quote:"La generalización de la enseñanza de la Historia coincide con [...] el principio de las levas de ciudadanos.",
+  ctx:"Sostiene que la Historia escolar se extendió para dar a los soldados reclutados un motivo para morir: honor, familia, pasado, orgullo.",
+  crit:"mat",
+  an:"La relación entre escuela, Historia nacional y servicio militar está bien estudiada. Eugen Weber (1976) mostró cómo la escuela y el ejército de la Tercera República convirtieron a los campesinos en franceses, y los manuales de Ernest Lavisse son un ejemplo clásico de Historia escolar patriótica. La tesis se vuelve unilateral cuando reduce esa finalidad a la única. La Historia escolar del siglo XIX también buscaba formar ciudadanos, legitimar el Estado liberal frente al Antiguo Régimen y alfabetizar. Coincidencia temporal y causa, además, no son lo mismo.",
+  q:"Busca un manual escolar español de las décadas de 1940 o 1950. ¿Qué virtudes propone imitar y qué enemigos presenta?"},
+ {who:"El opositor", page:"p. 29", quote:"Si es «nuestra» Historia, ya no es «la» Historia.",
+  ctx:"Responde al vocal joven, que le reprocha renunciar a los logros del pasado porque algunos alumnos se sientan incómodos en sus pupitres.",
+  crit:"sos",
+  an:"La observación es certera: el posesivo convierte una disciplina en un patrimonio que se defiende. En un aula diversa, y en Canarias lo es por su historia de migraciones en ambas direcciones, el alumnado no comparte un único «nosotros». La alternativa no es sustituir un relato identitario por otro, sino enseñar a pensar históricamente: trabajar con fuentes, explicar causas, reconocer perspectivas distintas y valorar éticamente el pasado. Es lo que proponen modelos como el de Seixas (2017) y lo que recoge la competencia ciudadana del currículo vigente.",
+  q:"En tu aula hay alumnado cuyas familias proceden de Venezuela, Marruecos y Senegal. ¿Cómo explicarías la conquista de Canarias sin pedir a nadie que elija un bando?"},
+ {who:"El opositor", page:"p. 60", quote:"No será porque hayamos aprendido algo del pasado.",
+  ctx:"Ante la idea de que la Historia sirve para no repetir errores, recuerda los genocidios posteriores al Holocausto y concluye que, si algún día dejan de producirse, no será gracias a la Historia.",
+  crit:"inf",
+  an:"Acierta en lo que critica: el pasado no se repite de forma idéntica y conocerlo no inmuniza a nadie. La frase sobre los pueblos condenados a repetir su historia procede, por cierto, de George Santayana (1905) y suele citarse alterada. Pero de ahí no se sigue que no aprendamos nada. Lo que el estudio de los genocidios permite reconocer no son situaciones idénticas, sino mecanismos recurrentes: la deshumanización del otro, la propaganda, la impunidad. El Marco de análisis para crímenes atroces de Naciones Unidas (2014) se elaboró precisamente a partir de esos casos históricos.",
+  q:"Elige un mecanismo, como la propaganda o la deshumanización, y busca un ejemplo histórico y uno actual adecuados para el alumnado de sexto de Primaria."},
+ {who:"El opositor", page:"p. 80", quote:"La Historia es el producto químico más peligroso que haya creado el intelecto.",
+  ctx:"Lo atribuye a «un colega» para explicar que la Historia ha guiado decisiones políticas y legitimado regímenes, no siempre para bien.",
+  crit:"sos",
+  an:"La frase es de Paul Valéry (Miradas al mundo actual, 1931); el opositor no la atribuye, lo que un examinador debería señalar. El contenido es sostenible. En una conferencia de 1993, Eric Hobsbawm sostuvo que la historia es a las ideologías nacionalistas, étnicas o fundamentalistas lo que la adormidera a la heroína: su materia prima, y la historia reciente de Europa ofrece ejemplos: las guerras de Yugoslavia movilizaron relatos medievales como la batalla de Kosovo de 1389. Precisamente por ese peligro, la Historia escolar necesita método y no puede dejarse solo en manos del relato.",
+  q:"¿Qué responsabilidad tiene un maestro o una maestra cuando elige qué episodios del pasado cuenta y cuáles omite?"},
+ {who:"El opositor", page:"pp. 81-82", quote:"La clave de la Historia no es qué hemos sido, sino qué queremos ser.",
+  ctx:"Es su conclusión: la única verdad absoluta es el presente, la Historia se narra mirando al futuro y lo que hay que negociar es el futuro, no el pasado. El prologuista suscribe la frase.",
+  crit:"mat",
+  an:"Contiene una intuición valiosa: la Historia orienta a las personas en el tiempo y conecta pasado, presente y expectativas de futuro. Jörn Rüsen ha llamado a esa función conciencia histórica. Pero, formulada así, la tesis reproduce lo que el opositor ha criticado durante toda la sesión. Narrar el pasado a partir del futuro que se desea es exactamente lo que hicieron los nacionalismos del siglo XIX. Para orientar sin manipular, el relato debe seguir respondiendo ante las fuentes: el futuro puede inspirar las preguntas, pero no dictar las respuestas.",
+  q:"Redacta en dos líneas tu propia definición de Historia para presentarla a un tribunal. ¿Qué papel tienen en ella las fuentes?"}],
+  act:{type:"classify", tab:"Finalidades", score:"Finalidades identificadas", next:"Clasificar finalidades",
+    title:"¿Para qué enseñamos Historia?",
+    lead:"A lo largo de la sesión aparecen tres grandes finalidades de la Historia escolar: construir identidad, educar moral y cívicamente, y desarrollar el pensamiento histórico. Clasifica estos objetivos, tomados de distintas épocas y propuestas, incluida la del propio opositor.",
+    cats:{
+      a:{l:"Identitaria", cls:"relato", d:"Busca que el alumnado se reconozca en una comunidad y en su pasado."},
+      b:{l:"Moral y cívica", cls:"interp", d:"Busca extraer del pasado lecciones, modelos o valores."},
+      c:{l:"Pensamiento histórico", cls:"dato", d:"Busca que el alumnado sepa cómo se construye el conocimiento del pasado."}},
+    items:[
+ {t:"Que el alumnado sienta orgullo de las gestas de sus antepasados.", a:"a", e:"Es el modelo que el opositor atribuye a las historias nacionales del siglo XIX (pp. 30-31)."},
+ {t:"Que conozca los reyes y las batallas que forjaron la patria.", a:"a", e:"Finalidad característica de los manuales escolares patrióticos."},
+ {t:"Que se identifique con una nueva cultura común, compartida por todos los ciudadanos.", a:"a", e:"Es la propuesta del propio opositor (p. 27). Cambia el contenido del «nosotros», pero mantiene una finalidad identitaria."},
+ {t:"Que aprenda de los errores del pasado para no repetirlos.", a:"b", e:"Es la tesis que el presidente defiende y el opositor rechaza (pp. 58-60)."},
+ {t:"Que imite las virtudes de los grandes personajes.", a:"b", e:"Es la tradición de la historia como maestra de la vida, que la profesora atribuye a Cicerón (p. 59)."},
+ {t:"Que valore la convivencia democrática a partir del estudio de las dictaduras.", a:"b", e:"Finalidad cívica presente en el currículo vigente, que necesita apoyarse en el estudio riguroso para no convertirse en adoctrinamiento."},
+ {t:"Que sepa distinguir una fuente primaria de una secundaria y preguntar quién la hizo y para qué.", a:"c", e:"Trabajo con pruebas: el núcleo de las estaciones 1 y 2."},
+ {t:"Que explique por qué dos manuales cuentan de forma distinta la conquista de Canarias.", a:"c", e:"Análisis de interpretaciones: reconoce que el relato depende de quién lo escribe, sin renunciar a las pruebas."},
+ {t:"Que comprenda que las personas del pasado pensaban de forma distinta a la nuestra.", a:"c", e:"Es la perspectiva histórica, uno de los conceptos del modelo de Seixas (2017), y la que falta cuando se juzga a Espartaco o a Esparta con valores actuales (estación 3)."}]},
+  dict:{fields:["La finalidad de la Historia escolar que defenderías ante un tribunal","El argumento del opositor que más ha cambiado tu forma de ver la Historia y el que rechazas","Tu definición de Historia, en dos líneas, para el alumnado de Primaria"],
+    votes:["Apto: su exposición obliga a repensar la Historia escolar","Apto con reservas: su diagnóstico es valioso y su propuesta final es contradictoria","No apto: su relativismo deja al alumnado sin criterios"],
+    rubric:["Distingo entre finalidades identitarias, morales y de pensamiento histórico.","Mi voto se apoya en lo trabajado en las estaciones anteriores.","Cito páginas concretas de la obra.","Mi definición de Historia es comprensible para el alumnado de Primaria."]}
+}];
+const UPCOMING = [];
+
+/* ---------- Estado ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let cur = 0;
+try{ const v = +localStorage.getItem("tribunal-st"); if(v>=0 && v<STATIONS.length) cur = v; }catch(e){}
+let ST = STATIONS[cur], S;
+function blank(){ return {tab:0, ci:0, votes:{}, cls:{}, d1:"", d2:"", d3:"", vote:"", r:[false,false,false,false]}; }
+function load(){ S = blank(); try{ const raw = localStorage.getItem(ST.key); if(raw) S = Object.assign(S, JSON.parse(raw)); }catch(e){} }
+function save(){ try{ localStorage.setItem(ST.key, JSON.stringify(S)); localStorage.setItem("tribunal-st", cur); }catch(e){} }
+load();
+
+/* ---------- Estaciones ---------- */
+function renderStations(){
+  $("#stations").innerHTML = STATIONS.map((s,i)=>`<button class="${i===cur?"on":""}" data-st="${i}" aria-current="${i===cur?"step":"false"}">${s.n} · ${s.short}</button>`).join("") +
+    UPCOMING.map((u,i)=>`<span title="En preparación">${STATIONS.length+i+1} · ${u}</span>`).join("");
+  $("#stations").querySelectorAll("[data-st]").forEach(b=>b.addEventListener("click", ()=>goStation(+b.dataset.st)));
+}
+function goStation(i){
+  cur = i; ST = STATIONS[i]; load(); save();
+  $("#st-eyebrow").textContent = `Estación ${ST.n} de 5`; $("#st-title").textContent = ST.title;
+  document.title = "El tribunal";
+  $("#t2-label").textContent = ST.act.tab;
+  renderStations(); renderIntro(); renderClaim(); renderAct(); renderDict();
+  setStation(ST.n); showTab(S.tab||0); updateAudience();
+}
+
+/* ---------- Pestañas ---------- */
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+let booted = false;
+function showTab(i, focus){
+  S.tab = i; save();
+  tabs.forEach((t,k)=>{ t.setAttribute("aria-selected", k===i); t.tabIndex = k===i?0:-1; $("#p-"+k).hidden = k!==i; });
+  if(focus) tabs[i].focus();
+  if(i===3) updateScore();
+  setView(i===1 ? "opositor" : i===3 ? "tribunal" : "sala");
+  if(booted && matchMedia("(max-width:820px)").matches) $(".panel").scrollIntoView({block:"start"});
+}
+tabs.forEach((t,i)=>{
+  t.addEventListener("click", ()=>showTab(i));
+  t.addEventListener("keydown", e=>{
+    if(e.key==="ArrowRight") showTab((i+1)%tabs.length, true);
+    if(e.key==="ArrowLeft") showTab((i+tabs.length-1)%tabs.length, true);
+  });
+});
+
+function renderIntro(){
+  $("#intro").innerHTML = ST.intro + `<div class="actions"><button class="btn" id="start">${ST.start}</button></div>`;
+  $("#start").onclick = ()=>showTab(1);
+}
+
+/* ---------- Afirmaciones ---------- */
+function renderClaim(){
+  const C = ST.claims, c = C[S.ci], v = S.votes[S.ci];
+  $("#cnum").textContent = `Afirmación ${S.ci+1} de ${C.length}`;
+  $("#dots").innerHTML = C.map((_,k)=>`<i class="${S.votes[k]?"done":""} ${k===S.ci?"cur":""}"></i>`).join("");
+  let h = `<blockquote class="claim">«${esc(c.quote)}»<cite>${esc(c.who.toUpperCase())} · ${c.page}</cite></blockquote>
+    <p class="small muted">${esc(c.ctx)}</p>
+    <p><b>¿Cómo valoras esta afirmación?</b></p>
+    <div class="opts" role="group" aria-label="Valoración">` +
+    Object.entries(OPTS).map(([k,l])=>`<button class="opt ${k}" data-v="${k}" aria-pressed="${v===k}"><span class="sw"></span>${l}</button>`).join("") + `</div>`;
+  if(v){
+    const match = v===c.crit;
+    h += `<div class="verdict" aria-live="polite">
+      <p><span class="chip ${c.crit}">Criterio propuesto: ${OPTS[c.crit]}</span></p>
+      <p class="small ${match?"":"muted"}">${match ? "Tu valoración coincide con el criterio propuesto." : "Tu valoración difiere del criterio propuesto. No es un error automático: defiende tu posición en el dictamen."}</p>
+      <p>${esc(c.an)}</p>
+      <p class="ask">${esc(c.q)}</p></div>`;
+  }
+  const last = S.ci===C.length-1;
+  h += `<div class="actions">
+    <button class="btn ghost" id="prev" ${S.ci===0?"disabled":""}>Anterior</button>
+    <button class="btn" id="next" ${v?"":"disabled"}>${last ? ST.act.next : "Siguiente afirmación"}</button>
+  </div>`;
+  $("#claim").innerHTML = h;
+  $("#claim").querySelectorAll("[data-v]").forEach(b=>b.addEventListener("click", ()=>{ S.votes[S.ci]=b.dataset.v; save(); renderClaim(); updateAudience(); if(window.reactAudience) window.reactAudience(); }));
+  $("#prev").onclick = ()=>{ S.ci--; save(); renderClaim(); };
+  $("#next").onclick = ()=>{ if(!last){ S.ci++; save(); renderClaim(); } else showTab(2); };
+}
+
+/* ---------- Actividad III ---------- */
+function renderAct(){
+  const A = ST.act;
+  let h = `<h2>${A.title}</h2><p>${A.lead}</p>`;
+  if(A.type==="classify"){
+    const cats = A.cats || {
+      dato:{l:"Dato", cls:"dato", d:"Verificable en las fuentes con independencia de quién lo enuncie."},
+      interp:{l:"Interpretación", cls:"interp", d:"Explicación causal o valorativa que se puede discutir con pruebas."},
+      relato:{l:"Relato", cls:"relato", d:"Lectura al servicio de una identidad colectiva, a menudo anacrónica."}};
+    h += `<div class="legend">` + Object.values(cats).map(c=>`<div><span class="chip ${c.cls}">${c.l}</span><span class="small">${c.d}</span></div>`).join("") + `</div>
+      <div class="cards">` + A.items.map((it,i)=>{
+        const v = S.cls[i];
+        return `<div class="card"><p>${it.s ? `<b>${esc(it.t)}</b><br><span class="small muted">${esc(it.s)}</span>` : esc(it.t)}</p>
+          <div class="opts" role="group" aria-label="Clasificación de ${esc(it.t)}">` +
+          Object.entries(cats).map(([k,c])=>`<button class="opt ${c.cls}" data-i="${i}" data-c="${k}" aria-pressed="${v===k}"><span class="sw"></span>${c.l}</button>`).join("") +
+          `</div>${v ? `<div class="fb" aria-live="polite"><span class="chip ${cats[it.a].cls}">${v===it.a?"Correcto":"Propuesta"}: ${cats[it.a].l}</span> <span class="muted">${esc(it.e)}</span></div>` : ""}</div>`;
+      }).join("") + `</div>`;
+  } else {
+    h += `<figure class="ruler" aria-label="Regla del tiempo: años entre los hechos y cada fuente">${rulerSVG(A.items)}</figure>
+      <div class="cards">` + A.items.map((it,i)=>{
+        const v = S.cls[i], gap = it.srcY - it.evY;
+        return `<div class="card"><p><b>${esc(it.src)}</b><br><span class="small muted">Narra: ${esc(it.ev)} · ${esc(it.evT)}</span></p>
+          <div class="opts four" role="group" aria-label="Distancia estimada para ${esc(it.src)}">` +
+          BUCKETS.map((l,k)=>`<button class="opt" data-i="${i}" data-c="${k}" aria-pressed="${String(v)===String(k)}">${l}</button>`).join("") +
+          `</div>${v!==undefined ? `<div class="fb" aria-live="polite">
+            <p><span class="chip ${+v===it.b?"dato":"interp"}">${+v===it.b?"Correcto":"Revisa"}: unos ${gap} años</span> <span class="muted">Redacción: ${esc(it.srcT)}</span></p>
+            <p class="small"><span class="chip ${it.ok?"dato":"relato"}">${it.lbl || (it.ok?"Cifra del opositor correcta":"Cifra del opositor inexacta")}</span> ${esc(it.nov)}</p>
+            <p class="small muted">${esc(it.e)}</p></div>` : ""}</div>`;
+      }).join("") + `</div>`;
+  }
+  h += `<div class="actions"><button class="btn" id="todict">Pasar al dictamen</button></div>`;
+  $("#act").innerHTML = h;
+  $("#todict").onclick = ()=>showTab(3);
+  $("#act").querySelectorAll("[data-c]").forEach(b=>b.addEventListener("click", ()=>{ S.cls[b.dataset.i]=b.dataset.c; save(); renderAct(); updateAudience(); if(window.reactAudience) window.reactAudience(); }));
+}
+function rulerSVG(items){
+  const W=360, L=8, R=344, row=30, top=26, H=top+items.length*row+6, x = y => L + (R-L)*Math.min(y,1000)/1000;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img"><title>Años transcurridos entre los hechos y cada fuente</title>`;
+  [0,250,500,750,1000].forEach(t=>{ s += `<line x1="${x(t)}" x2="${x(t)}" y1="${top-6}" y2="${H}" class="grid"/><text x="${x(t)}" y="${top-10}" class="tick" text-anchor="${t===0?"start":t===1000?"end":"middle"}">${t}</text>`; });
+  items.forEach((it,i)=>{
+    const y = top + i*row, shown = S.cls[i]!==undefined, gap = it.srcY-it.evY;
+    s += `<text x="${L}" y="${y+10}" class="lab">${esc(it.src)}</text>`;
+    s += shown ? `<rect x="${L}" y="${y+14}" width="${Math.max(3,x(gap)-L)}" height="8" rx="2" class="bar"/><text x="${Math.min(x(gap)+5,R-30)}" y="${y+22}" class="val">${gap}</text>`
+               : `<rect x="${L}" y="${y+14}" width="${R-L}" height="8" rx="2" class="ghost"/>`;
+  });
+  return s + `</svg><figcaption class="small muted">Años entre los hechos y la redacción de la fuente. Las barras aparecen al responder.</figcaption>`;
+}
+
+/* ---------- Dictamen ---------- */
+function updateScore(){
+  const a = ST.claims.filter((c,i)=>S.votes[i]===c.crit).length;
+  const b = ST.act.items.filter((it,i)=> ST.act.type==="classify" ? S.cls[i]===it.a : String(S.cls[i])===String(it.b)).length;
+  const s1=$("#s1"), s2=$("#s2");
+  if(s1){ s1.textContent = `${a}/${ST.claims.length}`; s2.textContent = `${b}/${ST.act.items.length}`; }
+  return [a,b];
+}
+
+function stationRecord(st){
+  let r = null;
+  if(st===ST) r = S; else { try{ const raw = localStorage.getItem(st.key); if(raw) r = JSON.parse(raw); }catch(e){} }
+  r = r || {votes:{}, vote:""};
+  const done = Object.keys(r.votes||{}).length, conc = st.claims.filter((c,i)=>(r.votes||{})[i]===c.crit).length;
+  return {done, conc, vote:r.vote||""};
+}
+function actaLines(){
+  return STATIONS.map(st=>{ const r = stationRecord(st); return {st, r}; });
+}
+function renderActa(){
+  const box = $("#acta"); if(!box) return;
+  box.innerHTML = `<div class="cards">` + actaLines().map(({st,r})=>`<div class="card small"><b>${st.n} · ${st.title}</b><br>
+    <span class="muted">Afirmaciones valoradas: ${r.done}/${st.claims.length} · concordancia: ${r.conc}/${st.claims.length}</span><br>
+    ${r.vote ? esc(r.vote) : `<span class="muted">Calificación sin emitir</span>`}</div>`).join("") + `</div>`;
+  const end = $("#ending");
+  end.hidden = !S.vote;
+  end.textContent = "En la novela, el presidente del tribunal comunica al opositor que nunca obtendrá plaza en esa universidad ni en ninguna otra que conozcan los presentes (p. 83). El tribunal no le rebate un solo argumento con pruebas: lo expulsa por incomodar. Tu voto no tiene por qué coincidir con el suyo; lo que lo distingue es que puedes justificarlo.";
+}
+function renderDict(){
+  const D = ST.dict;
+  $("#dict").innerHTML = `<h2>Dictamen del cuarto vocal</h2>
+    <div class="score"><span>Concordancia con el criterio propuesto <b id="s1"></b></span><span>${ST.act.score} <b id="s2"></b></span></div>
+    <p class="small muted">La concordancia no es una nota. Si discrepas del criterio propuesto, defiende tu posición aquí.</p>` +
+    D.fields.map((f,i)=>`<label class="f" for="d${i+1}">${f}</label><textarea id="d${i+1}"></textarea>`).join("") +
+    `<label class="f" for="vote">Calificación del ejercicio</label><select id="vote"><option value="">Sin emitir</option>${D.votes.map(v=>`<option>${v}</option>`).join("")}</select>
+    <h3>Autorrevisión antes de firmar</h3>` +
+    D.rubric.map((r,i)=>`<label class="check"><input type="checkbox" id="r${i+1}"> ${r}</label>`).join("") +
+    (ST.n===5 ? `<h3>Acta de las cinco estaciones</h3><div id="acta"></div><div id="ending" class="ask" hidden></div>` : "");
+  ["d1","d2","d3"].forEach(id=>{ const el=$("#"+id); el.value=S[id]||""; el.addEventListener("input", ()=>{ S[id]=el.value; save(); updateAudience(); }); });
+  $("#vote").value = S.vote||""; $("#vote").addEventListener("change", e=>{ S.vote=e.target.value; save(); updateAudience(); renderActa(); });
+  renderActa();
+  [1,2,3,4].forEach(n=>{ const el=$("#r"+n); el.checked=!!S.r[n-1]; el.addEventListener("change", ()=>{ S.r[n-1]=el.checked; save(); }); });
+  $("#toast").textContent=""; $("#copybox").hidden=true;
+  updateScore();
+}
+$("#copy").addEventListener("click", ()=>{
+  const [a,b] = updateScore();
+  const txt = `DICTAMEN DEL CUARTO VOCAL · Estación ${ST.n}: ${ST.title}
+Obra: Mateo-Sagasta, A. La oposición. Un relato sobre la invención de la historia.
+
+Valoraciones de las afirmaciones:
+${ST.claims.map((c,i)=>`- ${c.who}, ${c.page}: ${S.votes[i]?OPTS[S.votes[i]]:"sin valorar"}`).join("\n")}
+Concordancia con el criterio propuesto: ${a}/${ST.claims.length}. ${ST.act.score}: ${b}/${ST.act.items.length}.
+
+${ST.dict.fields.map((f,i)=>`${i+1}. ${f}:\n${S["d"+(i+1)]||"(sin redactar)"}`).join("\n\n")}
+
+Calificación: ${S.vote||"sin emitir"}${ST.n===5 ? "\n\nACTA DE LAS CINCO ESTACIONES\n" + actaLines().map(({st,r})=>`- ${st.n}. ${st.title}: ${r.done}/${st.claims.length} afirmaciones valoradas; concordancia ${r.conc}/${st.claims.length}; calificación: ${r.vote||"sin emitir"}`).join("\n") : ""}`;
+  const t = $("#toast"), box = $("#copybox");
+  const fallback = ()=>{ box.textContent=txt; box.hidden=false; box.style.whiteSpace="pre-wrap"; const r=document.createRange(); r.selectNodeContents(box); const s=getSelection(); s.removeAllRanges(); s.addRange(r); t.textContent="El navegador no permite copiar automáticamente. El texto está seleccionado: cópialo con el teclado."; };
+  try{ navigator.clipboard.writeText(txt).then(()=>{ t.textContent="Dictamen copiado. Pégalo en tu cuaderno o en la tarea del campus virtual."; box.hidden=true; }).catch(fallback); }catch(e){ fallback(); }
+});
+let resetArmed=false;
+$("#reset").addEventListener("click", e=>{
+  if(!resetArmed){ resetArmed=true; e.target.textContent="Pulsa otra vez para borrar esta estación"; setTimeout(()=>{resetArmed=false; e.target.textContent="Reiniciar estación";},4000); return; }
+  resetArmed=false; e.target.textContent="Reiniciar estación";
+  try{ localStorage.removeItem(ST.key); }catch(_){}
+  goStation(cur);
+});
+
+
+/* ---------- Escena Three.js ---------- */
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let paused = reduced, setView = ()=>{}, setAudience = ()=>{}, setStation = ()=>{};
+$("#pause").setAttribute("aria-pressed", paused); $("#pause").textContent = paused ? "Reanudar animación" : "Pausar animación";
+$("#pause").addEventListener("click", ()=>{ paused=!paused; $("#pause").setAttribute("aria-pressed",paused); $("#pause").textContent = paused?"Reanudar animación":"Pausar animación"; });
+
+function progress(){
+  const v = Object.keys(S.votes).length, c = Object.keys(S.cls).length;
+  const d = ["d1","d2","d3"].filter(k=>(S[k]||"").trim().length>20).length + (S.vote?1:0);
+  return Math.min(1, v/ST.claims.length*0.45 + c/ST.act.items.length*0.35 + d/4*0.2);
+}
+function updateAudience(){ setAudience(progress()); }
+
+function initProcedural(){
+  const canvas = $("#scene");
+  if(!window.THREE){ $("#nogl").hidden=false; return; }
+  let renderer;
+  try{ renderer = new THREE.WebGLRenderer({canvas, antialias:true}); }catch(e){ $("#nogl").hidden=false; canvas.hidden=true; return; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  if(THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d1014);
+  scene.fog = new THREE.Fog(0x0d1014, 14, 30);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 80);
+
+  scene.add(new THREE.HemisphereLight(0x8fa3b8, 0x1a1410, 0.55*Math.PI));
+  const sun = new THREE.DirectionalLight(0xffdca8, 1.15*Math.PI); sun.position.set(-8,9,-3); scene.add(sun);
+  const lamp = new THREE.PointLight(0xffc477, 0.9*Math.PI, 9, 0); lamp.position.set(0,3,-3.2); scene.add(lamp);
+
+  const M = c => new THREE.MeshStandardMaterial({color:c, flatShading:true, roughness:.85});
+  const wood = M(0x5a3b26), woodDark = M(0x3b261a), stone = M(0x2b3038), wall = M(0x232830);
+
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(16, 48), M(0x2a2420));
+  floor.rotation.x = -Math.PI/2; scene.add(floor);
+
+  // Muro del fondo con ventanal de lamas
+  const back = new THREE.Mesh(new THREE.BoxGeometry(18, 7, .4), wall); back.position.set(0,3.5,-7.5); scene.add(back);
+  const winMat = new THREE.MeshBasicMaterial({color:0xf3d7a1});
+  for(let w=-1; w<=1; w+=2){
+    const pane = new THREE.Mesh(new THREE.PlaneGeometry(2.2,3.2), winMat); pane.position.set(w*4.6,3.8,-7.28); scene.add(pane);
+    for(let s=0; s<9; s++){ const slat = new THREE.Mesh(new THREE.BoxGeometry(2.3,.12,.08), woodDark); slat.position.set(w*4.6,2.35+s*.36,-7.2); slat.rotation.x=.5; scene.add(slat); }
+  }
+
+  // Haces de luz entre las cortinas
+  const gc = document.createElement("canvas"); gc.width=4; gc.height=128;
+  const gx = gc.getContext("2d"); const gr = gx.createLinearGradient(0,0,0,128);
+  gr.addColorStop(0,"rgba(255,220,160,.55)"); gr.addColorStop(1,"rgba(255,220,160,0)"); gx.fillStyle=gr; gx.fillRect(0,0,4,128);
+  const beamMat = new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(gc), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide, opacity:.5});
+  [-4.6,4.6].forEach(x=>{ for(let k=0;k<3;k++){
+    const b = new THREE.Mesh(new THREE.PlaneGeometry(1.6,9), beamMat); b.position.set(x*.7+(k-1)*.5, 3, -3.6); b.rotation.set(-.62, x>0?-.25:.25, 0); scene.add(b);
+  }});
+
+  // Motas de polvo
+  const N=420, pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){ pos[i*3]=(Math.random()-.5)*9; pos[i*3+1]=Math.random()*5.5; pos[i*3+2]=-6+Math.random()*5; }
+  const dustG = new THREE.BufferGeometry(); dustG.setAttribute("position", new THREE.BufferAttribute(pos,3));
+  const dust = new THREE.Points(dustG, new THREE.PointsMaterial({color:0xffe2b0, size:.035, transparent:true, opacity:.75, depthWrite:false}));
+  scene.add(dust);
+
+  // Personas estilizadas
+  function person(color, opts={}){
+    const g = new THREE.Group(), w = opts.wide||1;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(.2*w,.3*w,.9,7), M(color)); body.position.y=.45; g.add(body);
+    const head = new THREE.Mesh(new THREE.IcosahedronGeometry(.19,0), M(0xc9a084)); head.position.y=1.08; g.add(head);
+    return g;
+  }
+
+  // Tribunal
+  const table = new THREE.Mesh(new THREE.BoxGeometry(4.4,.9,1.1), woodDark); table.position.set(0,.45,-4.4); scene.add(table);
+  const cloth = new THREE.Mesh(new THREE.BoxGeometry(4.5,.06,1.2), M(0x6b2f2a)); cloth.position.set(0,.92,-4.4); scene.add(cloth);
+  const dais = new THREE.Mesh(new THREE.BoxGeometry(6,.25,2.6), stone); dais.position.set(0,.12,-5); scene.add(dais);
+  const pres = person(0x2c3440,{wide:1.45}); pres.position.set(0,.25,-5.15); pres.scale.setScalar(1.05); scene.add(pres);
+  const woman = person(0x3d4f63); woman.position.set(-1.4,.25,-5.15); scene.add(woman);
+  [0xd9534f,0x5bc0de,0xf0ad4e,0x5cb85c,0x9b59b6].forEach((c,i)=>{ const b=new THREE.Mesh(new THREE.SphereGeometry(.035,6,4), new THREE.MeshBasicMaterial({color:c})); const a=-.9+i*.45; b.position.set(-1.4+Math.sin(a)*.2,1.06,-5.15+Math.cos(a)*.2); scene.add(b); });
+  const young = person(0x9a7034); young.position.set(1.4,.25,-5.15); scene.add(young);
+  const glasses = new THREE.Mesh(new THREE.TorusGeometry(.05,.012,4,10), M(0x111111)); glasses.position.set(0,1.38,-4.98); scene.add(glasses);
+
+  // Opositor y atril
+  const lectern = new THREE.Mesh(new THREE.CylinderGeometry(.28,.4,1.1,6), wood); lectern.position.set(0,.55,-1.4); scene.add(lectern);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(.9,.06,.6), wood); top.position.set(0,1.14,-1.45); top.rotation.x=-.25; scene.add(top);
+  const opp = person(0x4a5560); opp.position.set(0,0,-.7); scene.add(opp);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.45,.55,32), new THREE.MeshBasicMaterial({color:0xcfa95e, transparent:true, opacity:.6, side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2; ring.position.set(0,.02,-.7); scene.add(ring);
+  // La pluma: «la Historia» de catorce centímetros, lacada en negro con remates dorados
+  const pen = new THREE.Group();
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,.42,10), new THREE.MeshStandardMaterial({color:0x08080a, roughness:.2, metalness:.4}));
+  const gold = new THREE.MeshStandardMaterial({color:0xd4af5a, roughness:.3, metalness:.9, emissive:0x3a2a08});
+  const cap1 = new THREE.Mesh(new THREE.CylinderGeometry(.033,.033,.05,10), gold); cap1.position.y=.22;
+  const cap2 = new THREE.Mesh(new THREE.ConeGeometry(.03,.07,10), gold); cap2.position.y=-.245; cap2.rotation.x=Math.PI;
+  pen.add(barrel,cap1,cap2); pen.position.set(.35,1.55,-.85); pen.rotation.z=.9; scene.add(pen);
+
+  // Gradas en semicírculo y asientos del público
+  const seats = [];
+  for(let r=0;r<5;r++){
+    const rad = 5.2 + r*1.15, h = .35 + r*.42;
+    const segs = 13 + r*2;
+    for(let s=0;s<segs;s++){
+      const a = -1.15 + 2.3*(s+.5)/segs;
+      const x = Math.sin(a)*rad, z = -4.4 + Math.cos(a)*rad;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(2.3*rad/segs*1.02, h, 1.15), r%2?woodDark:wood);
+      step.position.set(x, h/2, z); step.rotation.y = a; scene.add(step);
+      seats.push({x, y:h, z, a, k:Math.random()});
+    }
+  }
+  seats.sort((p,q)=> (Math.hypot(p.x,p.z+4.4)+p.k*3) - (Math.hypot(q.x,q.z+4.4)+q.k*3));
+  const palette=[0x46525e,0x5b4a3c,0x3f5a52,0x6a5a48,0x4b4160,0x5e6a74,0x7a5d3a];
+  const crowd = seats.map((s,i)=>{ const p=person(palette[i%palette.length]); p.scale.setScalar(.72); p.position.set(s.x, s.y-.02, s.z); p.rotation.y=s.a+Math.PI; p.visible=false; p.userData.t=0; scene.add(p); return p; });
+  let target = 6;
+  setAudience = f => { target = Math.round(6 + f*(crowd.length-6)); $("#aud").textContent = target; if(paused) crowd.forEach((p,i)=>{ p.visible=i<target; p.userData.t=1; p.scale.setScalar(.72); }); };
+
+
+  // Estación 2: códices sobre la mesa y Columna de las Serpientes junto al atril
+  const props2 = new THREE.Group(); props2.visible = false; scene.add(props2);
+  const leather=[0x6b3b24,0x4a2e1e,0x7a5230,0x3f3a2c];
+  for(let i=0;i<5;i++){ const b=new THREE.Mesh(new THREE.BoxGeometry(.42,.09,.3), M(leather[i%4])); b.position.set(-1.9+.02*i,.98+i*.09,-4.25); b.rotation.y=(i%2?.12:-.08); props2.add(b); }
+  for(let i=0;i<3;i++){ const r=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.5,10), M(0xd9c79c)); r.rotation.z=Math.PI/2; r.position.set(1.85,.99+i*.1,-4.2+i*.04); props2.add(r); }
+  const bronze = new THREE.MeshStandardMaterial({color:0x7a6a3c, roughness:.45, metalness:.7, flatShading:true});
+  for(let k=0;k<3;k++){
+    const pts=[]; for(let j=0;j<=60;j++){ const t=j/60, a=t*Math.PI*10+k*Math.PI*2/3; pts.push(new THREE.Vector3(Math.cos(a)*.13, t*2.1, Math.sin(a)*.13)); }
+    props2.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),160,.06,6), bronze));
+  }
+  const base2 = new THREE.Mesh(new THREE.CylinderGeometry(.35,.42,.25,8), stone); base2.position.y=.12; props2.add(base2);
+  props2.children.slice(-4).forEach(m=>m.position.x+=2.6);
+  props2.children.slice(-4).forEach(m=>m.position.z+=-2);
+
+  // Estación 3: la Tizona en su urna y la Piedra de Scone
+  const props3 = new THREE.Group(); props3.visible = false; scene.add(props3);
+  const ped = new THREE.Mesh(new THREE.BoxGeometry(.7,1,.7), stone); ped.position.y=.5; props3.add(ped);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(.66,1.25,.66), new THREE.MeshStandardMaterial({color:0xbfd6e0, transparent:true, opacity:.16, roughness:.05, metalness:.1, depthWrite:false}));
+  glass.position.y=1.63; props3.add(glass);
+  const steel = new THREE.MeshStandardMaterial({color:0xc9ced4, roughness:.25, metalness:.9, flatShading:true});
+  const sword = new THREE.Group();
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(.06,.78,.012), steel); blade.position.y=.1; sword.add(blade);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(.034,.1,4), steel); tip.position.y=-.34; tip.rotation.z=Math.PI; sword.add(tip);
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(.26,.035,.04), gold); guard.position.y=.5; sword.add(guard);
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(.018,.018,.16,8), M(0x3a2414)); grip.position.y=.6; sword.add(grip);
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(.035,8,6), gold); pommel.position.y=.7; sword.add(pommel);
+  sword.position.y=1.55; props3.add(sword);
+  props3.position.set(-2.6,0,-2);
+  const scone = new THREE.Mesh(new THREE.BoxGeometry(.66,.27,.42), M(0x8a6e52)); scone.position.set(2.5,.14,-2.2); scone.rotation.y=.4; scene.add(scone); scone.visible=false;
+
+  // Estación 4: maqueta de las naves, una de ellas en llamas
+  const props4 = new THREE.Group(); props4.visible = false; scene.add(props4);
+  const tbl = new THREE.Mesh(new THREE.BoxGeometry(1.6,.8,1.1), woodDark); tbl.position.y=.4; props4.add(tbl);
+  const sea = new THREE.Mesh(new THREE.BoxGeometry(1.5,.04,1), new THREE.MeshStandardMaterial({color:0x1f4a5e, roughness:.3, metalness:.2})); sea.position.y=.82; props4.add(sea);
+  const flames = [];
+  [[-.45,-.2,.3,0],[0,.2,-.2,1],[.45,-.15,.1,0]].forEach(([x,z,r,fire])=>{
+    const ship = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(.36,.09,.13), wood); ship.add(hull);
+    const prow = new THREE.Mesh(new THREE.ConeGeometry(.065,.14,4), wood); prow.rotation.z=-Math.PI/2; prow.position.x=.24; ship.add(prow);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,.34,5), woodDark); mast.position.y=.2; ship.add(mast);
+    const sail = new THREE.Mesh(new THREE.PlaneGeometry(.2,.18), new THREE.MeshStandardMaterial({color:0xe6dcc2, side:THREE.DoubleSide, flatShading:true})); sail.position.set(0,.22,0); sail.rotation.y=Math.PI/2; ship.add(sail);
+    if(fire){ for(let f=0;f<5;f++){ const fl=new THREE.Mesh(new THREE.ConeGeometry(.04,.16,6), new THREE.MeshBasicMaterial({color:f%2?0xffb347:0xff6a2a, transparent:true, opacity:.85, depthWrite:false})); fl.position.set(-.14+f*.07,.12,0); fl.userData.k=Math.random()*6; ship.add(fl); flames.push(fl);} }
+    else { ship.rotation.z = .25; ship.position.y = -.04; }
+    ship.position.set(x, .89 + (fire?0:-.02), z); ship.rotation.y = r; props4.add(ship);
+  });
+  const fireLight = new THREE.PointLight(0xff7a30, 0, 2.5); fireLight.position.set(0,1.3,.2); props4.add(fireLight);
+  props4.position.set(-2.7,0,-1.9);
+
+  // Estación 5: un aula de Primaria
+  const props5 = new THREE.Group(); props5.visible = false; scene.add(props5);
+  const kids=[0xc0504d,0x4f81bd,0x9bbb59,0x8064a2,0xf79646,0x4bacc6];
+  for(let row=0; row<2; row++) for(let col=0; col<3; col++){
+    const x=(col-1)*.75, z=row*.8;
+    const desk=new THREE.Mesh(new THREE.BoxGeometry(.55,.04,.38), wood); desk.position.set(x,.55,z); props5.add(desk);
+    [[-.24,-.16],[.24,-.16],[-.24,.16],[.24,.16]].forEach(([dx,dz])=>{ const leg=new THREE.Mesh(new THREE.BoxGeometry(.03,.53,.03), woodDark); leg.position.set(x+dx,.27,z+dz); props5.add(leg); });
+    const book=new THREE.Mesh(new THREE.BoxGeometry(.2,.03,.14), M(kids[(row*3+col+2)%6])); book.position.set(x,.59,z); props5.add(book);
+    const kid=person(kids[row*3+col]); kid.scale.setScalar(.5); kid.position.set(x,.05,z+.32); kid.rotation.y=Math.PI; props5.add(kid);
+  }
+  const board=new THREE.Mesh(new THREE.BoxGeometry(1.8,.9,.05), M(0x23382e)); board.position.set(0,1.35,-.55); props5.add(board);
+  props5.position.set(-2.8,0,-2.2); props5.rotation.y=.5;
+  setStation = n => { props2.visible = n===2; props3.visible = n===3; scone.visible = n===3; props4.visible = n===4; props5.visible = n===5; };
+  const props3Sword = sword;
+
+  // Cámara: órbita por arrastre y puntos de vista
+  const VIEWS = {
+    sala:{r:10.5, yaw:.35, pitch:.5, look:new THREE.Vector3(0,.9,-3)},
+    opositor:{r:3.6, yaw:.6, pitch:.28, look:new THREE.Vector3(0,1.2,-1.1)},
+    tribunal:{r:4.4, yaw:-.05, pitch:.22, look:new THREE.Vector3(0,1.1,-4.8)}
+  };
+  const cam = {r:10.5, yaw:.35, pitch:.5, look:VIEWS.sala.look.clone()}, goal = {...cam, look:cam.look.clone()};
+  setView = name => {
+    const v = VIEWS[name]; goal.r=v.r; goal.yaw=v.yaw; goal.pitch=v.pitch; goal.look.copy(v.look);
+    document.querySelectorAll("[data-view]").forEach(b=>b.setAttribute("aria-pressed", b.dataset.view===name));
+    if(paused){ Object.assign(cam,{r:goal.r,yaw:goal.yaw,pitch:goal.pitch}); cam.look.copy(goal.look); }
+  };
+  document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click", ()=>setView(b.dataset.view)));
+  let drag=null;
+  canvas.addEventListener("pointerdown", e=>{ drag={x:e.clientX,y:e.clientY,yaw:goal.yaw,pitch:goal.pitch}; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener("pointermove", e=>{ if(!drag) return; goal.yaw = Math.max(-1.1,Math.min(1.1, drag.yaw-(e.clientX-drag.x)*.006)); goal.pitch=Math.max(.08,Math.min(1.1, drag.pitch+(e.clientY-drag.y)*.004)); if(paused){cam.yaw=goal.yaw;cam.pitch=goal.pitch;} });
+  canvas.addEventListener("pointerup", ()=>drag=null);
+  canvas.addEventListener("pointercancel", ()=>drag=null);
+
+  function resize(){ const r=canvas.parentElement.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect=r.width/Math.max(1,r.height); camera.updateProjectionMatrix(); }
+  new ResizeObserver(resize).observe(canvas.parentElement); resize();
+
+  const clock = new THREE.Clock();
+  function frame(){
+    const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+    if(!paused){
+      const k = 1-Math.pow(.02, dt);
+      cam.r+=(goal.r-cam.r)*k; cam.yaw+=(goal.yaw-cam.yaw)*k; cam.pitch+=(goal.pitch-cam.pitch)*k; cam.look.lerp(goal.look,k);
+      const p = dustG.attributes.position;
+      for(let i=0;i<N;i++){ let y=p.getY(i)+dt*.06; if(y>5.5) y=0; p.setY(i,y); p.setX(i, p.getX(i)+Math.sin(t*.3+i)*dt*.02); }
+      p.needsUpdate=true;
+      if(props3.visible) props3Sword.rotation.y += dt*.5;
+      if(props4.visible){ flames.forEach(f=>{ const k=.75+.35*Math.sin(t*9+f.userData.k)+.15*Math.sin(t*23+f.userData.k); f.scale.set(1,k,1); }); fireLight.intensity = .8+.3*Math.sin(t*11); }
+      pen.rotation.y += dt*.8; pen.position.y = 1.55+Math.sin(t*1.6)*.04;
+      ring.material.opacity = .35+.3*Math.sin(t*2.4);
+      pres.rotation.z = Math.sin(t*.7)*.02;
+      crowd.forEach((c,i)=>{
+        const want = i<target ? 1 : 0;
+        if(want && !c.visible){ c.visible=true; c.userData.t=0; }
+        c.userData.t += (want-c.userData.t)*Math.min(1,dt*4);
+        c.scale.setScalar(.72*Math.max(.001,c.userData.t));
+        if(!want && c.userData.t<.02) c.visible=false;
+      });
+    }
+    const cp = Math.cos(cam.pitch);
+    camera.position.set(cam.look.x+Math.sin(cam.yaw)*cam.r*cp, cam.look.y+Math.sin(cam.pitch)*cam.r, cam.look.z+Math.cos(cam.yaw)*cam.r*cp);
+    camera.lookAt(cam.look);
+    renderer.render(scene,camera);
+    requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+if(window.THREE && window.initRealistic) initRealistic(); else { $("#loading").hidden = true; initProcedural(); }
+
+/* ---------- Arranque ---------- */
+goStation(cur); booted = true;
+</script>
